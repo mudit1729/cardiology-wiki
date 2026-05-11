@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Tags | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="tags-page">
+    <div class="section-heading">
+      <h1>Tags</h1>
+      <p class="muted">{{ all_tags|length }} tags across the wiki</p>
+    </div>
+
+    <div class="tags-cloud">
+      {% for tag, count in all_tags.items() %}
+        <a href="{{ url_for('tags', t=tag) }}" class="tag-cloud-item {% if tag == active_tag %}active{% endif %}">
+          {{ tag }} <span class="tag-count">{{ count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+
+    {% if active_tag %}
+      <div class="tag-results">
+        <h2>Pages tagged <span class="tag-pill active">{{ active_tag }}</span></h2>
+        <div class="papers-grid">
+          {% for p in tag_pages %}
+            <a class="paper-card" href="{{ url_for('page', page_path=p.path) }}">
+              <div class="paper-card-header">
+                <strong>{{ p.title }}</strong>
+                {% if p.status %}
+                  <span class="status-dot status-{{ p.status }}"></span>
+                {% endif %}
+              </div>
+              {% if p.page_type %}
+                <span class="type-badge small">{{ p.page_type }}</span>
+              {% endif %}
+              <p>{{ p.excerpt }}</p>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

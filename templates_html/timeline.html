@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="timeline-page">
+    <div class="section-heading">
+      <h1>Research Timeline</h1>
+      <p class="muted">Trials and evidence grouped by research direction across time.</p>
+    </div>
+
+    <div class="timeline-filters">
+      <button class="chip active" onclick="toggleDirection(this, 'all')">All</button>
+      {% for direction in timeline_data.keys() %}
+        <button class="chip" onclick="toggleDirection(this, '{{ direction }}')">
+          {{ direction }}
+          <span class="badge small">{{ timeline_data[direction]|length }}</span>
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="timeline-container">
+      {% for direction, papers in timeline_data.items() %}
+        <div class="timeline-lane" data-direction="{{ direction }}">
+          <div class="lane-header">
+            <h3>{{ direction }}</h3>
+            <span class="badge">{{ papers|length }}</span>
+          </div>
+          <div class="lane-track">
+            {% set ns = namespace(prev_year='') %}
+            {% for p in papers %}
+              {% if p.year != ns.prev_year %}
+                <div class="year-marker">{{ p.year }}</div>
+                {% set ns.prev_year = p.year %}
+              {% endif %}
+              <a href="{{ p.url }}" class="timeline-node" data-year="{{ p.year }}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                  <strong>{{ p.title }}</strong>
+                  <div class="timeline-card-meta">
+                    {% if p.year %}<span class="meta-pill small">{{ p.year }}</span>{% endif %}
+                    {% if p.citations %}<span class="meta-pill small">{{ p.citations }} cit.</span>{% endif %}
+                  </div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <script>
+    function toggleDirection(el, direction) {
+      document.querySelectorAll('.timeline-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelectorAll('.timeline-lane').forEach(lane => {
+        if (direction === 'all') {
+          lane.style.display = '';
+        } else {
+          lane.style.display = lane.dataset.direction === direction ? '' : 'none';
+        }
+      });
+    }
+  </script>
+{% endblock %}

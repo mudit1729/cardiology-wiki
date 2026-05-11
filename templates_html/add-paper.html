@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Add Paper | {{ repo_title }}{% endblock %}
+
+{% block content %}
+<section class="page-shell">
+  <div class="add-paper-page">
+    <header class="add-paper-header">
+      <p class="eyebrow">Ingest</p>
+      <h1>Add a paper</h1>
+      <p class="lede">
+        Paste a PubMed / NEJM / Lancet / JACC / arxiv link, or upload a PDF.
+        The pipeline runs Mistral OCR &rarr; Semantic Scholar (XAI fallback) &rarr; DeepSeek
+        summarization &rarr; Grok final integration, and writes the wiki page automatically.
+      </p>
+    </header>
+
+    <form id="ingest-form" class="add-paper-form">
+      <div class="field">
+        <label for="paper-url">Paper URL</label>
+        <input id="paper-url" name="url" type="url" placeholder="https://pubmed.ncbi.nlm.nih.gov/12345678/"
+               autocomplete="off" autofocus>
+        <small>Reliable sources: pubmed.ncbi.nlm.nih.gov &middot; nejm.org &middot; thelancet.com &middot; jacc.org &middot; ahajournals.org &middot; arxiv.org</small>
+      </div>
+
+      <div class="field">
+        <label for="paper-pdf">&hellip;or upload a PDF</label>
+        <input id="paper-pdf" name="pdf" type="file" accept="application/pdf">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="paper-title">Title hint <span class="muted">(optional)</span></label>
+          <input id="paper-title" name="title" type="text" placeholder="Used if Semantic Scholar can't find the paper">
+        </div>
+        <div class="field">
+          <label for="paper-slug">Slug override <span class="muted">(optional)</span></label>
+          <input id="paper-slug" name="slug" type="text" placeholder="e.g. ischemia-2020-revascularization">
+        </div>
+      </div>
+
+      <div class="add-paper-actions">
+        <button type="submit" id="ingest-submit" class="primary-button">Run pipeline</button>
+        <button type="button" id="ingest-reset" class="text-button">Reset</button>
+      </div>
+    </form>
+
+    <section class="ingest-progress hidden" id="ingest-progress" aria-live="polite">
+      <div class="progress-stages">
+        <div class="stage" data-stage="source"><span class="stage-dot"></span>Source</div>
+        <div class="stage" data-stage="ocr"><span class="stage-dot"></span>OCR</div>
+        <div class="stage" data-stage="citation"><span class="stage-dot"></span>Citation</div>
+        <div class="stage" data-stage="summary"><span class="stage-dot"></span>Summary</div>
+        <div class="stage" data-stage="integrate"><span class="stage-dot"></span>Integration</div>
+        <div class="stage" data-stage="write"><span class="stage-dot"></span>Write</div>
+      </div>
+      <ul class="progress-log" id="progress-log"></ul>
+      <div class="progress-result hidden" id="progress-result"></div>
+    </section>
+  </div>
+</section>
+
+<script>
+(function() {
+  const form    = document.getElementById('ingest-form');
+  const submit  = document.getElementById('ingest-submit');
+  const reset   = document.getElementById('ingest-reset');
+  const panel   = document.getElementById('ingest-progress');
+  const log     = document.getElementById('progress-log');
+  const result  = document.getElementById('progress-result');
+  const stages  = panel.querySelectorAll('.stage');
+
+  function setStage(name, state) {
+    const el = panel.querySelector(`.stage[data-stage="${name}"]`);
+    if (!el) return;
+    el.classList.remove('active', 'done', 'error');
+    if (state) el.classList.add(state);
+  }
+  function activateStage(name) {
+    stages.forEach(s => {
+      if (s.dataset.stage === name) s.classList.add('active');
+      else if (s.classList.contains('active')) {
+        s.classList.remove('active');
+        s.classList.add('done');
+      }
+    });
+  }
+  function appendLog(text, kind = 'info') {
+    const li = document.createElement('li');
+    li.className = `log-line log-${kind}`;
+    const ts = document.createElement('span');
+    ts.className = 'log-ts';
+    const d = new Date();
+    ts.textContent = d.toLocaleTimeString();
+    const body = document.createElement('span');
+    body.className = 'log-body';
+    body.textContent = text;
+    li.append(ts, body);
+    log.appendChild(li);
+    log.scrollTop = log.scrollHeight;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  reset.addEventListener('click', () => {
+    form.reset();
+    panel.classList.add('hidden');
+    log.innerHTML = '';
+    result.classList.add('hidden');
+    result.innerHTML = '';
+    stages.forEach(s => s.className = 'stage');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submit.disabled = true;
+    log.innerHTML = '';
+    result.classList.add('hidden');
+    result.innerHTML = '';
+    panel.classList.remove('hidden');
+    stages.forEach(s => s.className = 'stage');
+
+    const fd = new FormData(form);
+
+    try {
+      const resp = await fetch('/api/papers/ingest', { method: 'POST', body: fd });
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(err.error || resp.statusText);
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+        for (const raw of events) {
+          if (!raw.trim()) continue;
+          const lines = raw.split('\n');
+          const eventName = (lines.find(l => l.startsWith('event:')) || 'event: message').slice(6).trim();
+          const dataLine  = lines.find(l => l.startsWith('data:'));
+          let data = {};
+          try { data = dataLine ? JSON.parse(dataLine.slice(5).trim()) : {}; } catch {}
+
+          if (eventName === 'status') {
+            if (data.stage) activateStage(data.stage);
+            appendLog(data.message || '');
+          } else if (eventName === 'source') {
+            appendLog(`Source: ${data.kind}${data.id ? ' · ' + data.id : ''}`, 'info');
+          } else if (eventName === 'metadata') {
+            const bits = [];
+            if (data.title) bits.push(data.title);
+            if (data.year)  bits.push(`(${data.year})`);
+            if (data.venue) bits.push('· ' + data.venue);
+            if (data.citations !== undefined) bits.push(`· ${data.citations} citations`);
+            appendLog('Metadata: ' + bits.join(' '), 'meta');
+          } else if (eventName === 'done') {
+            stages.forEach(s => { if (s.classList.contains('active')) { s.classList.remove('active'); s.classList.add('done'); } });
+            const el = panel.querySelector('.stage[data-stage="write"]');
+            if (el) { el.classList.remove('active'); el.classList.add('done'); }
+            result.classList.remove('hidden');
+            result.innerHTML = `
+              <div class="result-card">
+                <h3>Ingest complete</h3>
+                <p><strong>${escapeHtml(data.title || data.slug)}</strong> — ${escapeHtml(String(data.citations || 0))} citations</p>
+                <p class="muted">Wiki page: <code>${escapeHtml(data.page_path)}</code></p>
+                <p class="muted">OCR cached: <code>${escapeHtml(data.ocr_path)}</code></p>
+                <a class="primary-button" href="/page/${encodeURI(data.page_path.replace(/\.md$/, ''))}">Open paper &rarr;</a>
+              </div>`;
+          } else if (eventName === 'error') {
+            appendLog(data.message || 'Pipeline error', 'error');
+            stages.forEach(s => { if (s.classList.contains('active')) { s.classList.remove('active'); s.classList.add('error'); } });
+          }
+        }
+      }
+    } catch (err) {
+      appendLog('Error: ' + (err.message || err), 'error');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

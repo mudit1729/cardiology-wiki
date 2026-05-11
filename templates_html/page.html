@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="content-layout">
+    <article class="panel article-panel">
+      <div class="article-header">
+        <nav class="breadcrumbs">
+          {% for crumb in breadcrumbs %}
+            {% if crumb.exists %}
+              <a href="{{ url_for('page', page_path=crumb.path) }}">{{ crumb.label }}</a>
+            {% else %}
+              <span>{{ crumb.label }}</span>
+            {% endif %}
+            {% if not loop.last %}<span class="breadcrumb-sep">/</span>{% endif %}
+          {% endfor %}
+        </nav>
+      </div>
+
+      {% if page.tags or page.status or page.page_type %}
+        <div class="article-meta-bar">
+          {% if page.status %}
+            <span class="status-badge status-{{ page.status }}">{{ page.status }}</span>
+          {% endif %}
+          {% if page.page_type %}
+            <span class="type-badge">{{ page.page_type }}</span>
+          {% endif %}
+          {% if page.year %}
+            <span class="meta-pill">{{ page.year }}</span>
+          {% endif %}
+          {% if page.venue %}
+            <span class="meta-pill">{{ page.venue }}</span>
+          {% endif %}
+          {% if page.citations %}
+            <span class="citation-count">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+              {{ page.citations }} citations
+            </span>
+          {% endif %}
+          {% if page.tags %}
+            <div class="tag-list">
+              {% for tag in page.tags %}
+                <a href="{{ url_for('tags', t=tag) }}" class="tag-pill">{{ tag }}</a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="prose">
+        {{ page.html | safe }}
+      </div>
+    </article>
+
+    <aside class="sidebar-panel">
+      <div class="sidebar-block">
+        <h3>Page Info</h3>
+        <div class="sidebar-meta">
+          <span class="meta-label">Path</span>
+          <code>{{ page.path }}.md</code>
+        </div>
+        <div class="sidebar-meta">
+          <span class="meta-label">Outgoing</span>
+          <span>{{ page.links|length }} links</span>
+        </div>
+        <div class="sidebar-meta">
+          <span class="meta-label">Incoming</span>
+          <span>{{ backlinks|length }} backlinks</span>
+        </div>
+      </div>
+
+      {% if backlinks %}
+        <div class="sidebar-block">
+          <h3>Backlinks</h3>
+          <ul class="backlink-list">
+            {% for backlink in backlinks %}
+              <li>
+                <a href="{{ url_for('page', page_path=backlink.path) }}">{{ backlink.title }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="sidebar-block">
+        <h3>Quick Jump</h3>
+        <div class="quick-links">
+          <a href="{{ url_for('page', page_path='index') }}">Index</a>
+          <a href="{{ url_for('page', page_path='wiki/overview') }}">Overview</a>
+          <a href="{{ url_for('papers') }}">Trials</a>
+          <a href="{{ url_for('page', page_path='log') }}">Log</a>
+        </div>
+      </div>
+    </aside>
+  </section>
+{% endblock %}

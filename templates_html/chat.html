@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Chat | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="chat-page">
+    <aside class="chat-source-panel open" id="source-panel">
+      <div class="chat-panel-head">
+        <div>
+          <h1>Trial Context</h1>
+          <p><span id="selected-count">0</span> selected</p>
+        </div>
+        <button class="icon-button panel-close" id="close-panel" title="Close panel" aria-label="Close panel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="chat-panel-controls">
+        <label class="field-label" for="topic-select">Topic</label>
+        <select id="topic-select" class="chat-select">
+          {% for value, label in topics %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <label class="field-label" for="paper-search">Filter</label>
+        <input id="paper-search" class="chat-search" type="search" placeholder="Trial name or tag">
+        <div class="paper-actions">
+          <button type="button" class="text-button" id="select-visible">Select visible</button>
+          <button type="button" class="text-button" id="clear-selected">Clear</button>
+        </div>
+      </div>
+
+      <div class="paper-check-list" id="paper-list"></div>
+    </aside>
+
+    <div class="chat-workspace">
+      <div class="chat-toolbar">
+        <button class="source-toggle" id="open-panel" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span>Trials</span>
+        </button>
+        <div class="thinking-toggle" role="group" aria-label="Thinking mode">
+          <button type="button" class="active" data-thinking="low">Low</button>
+          <button type="button" data-thinking="high">High</button>
+        </div>
+      </div>
+
+      <div class="chat-thread" id="chat-thread">
+        <div class="chat-empty">
+          <h2>Ask the wiki</h2>
+          <p>Selected trial summaries are sent as context.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <form class="chat-composer" id="chat-form">
+      <textarea id="chat-input" rows="1" placeholder="Ask about trials, guidelines, procedures..."></textarea>
+      <button class="send-button" id="send-button" type="submit" title="Send" aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </form>
+  </section>
+
+  <script>
+    const papers = {{ papers | tojson }};
+    const maxPapers = {{ max_papers | int }};
+    const selected = new Set();
+    const conversation = [];
+    let thinkingMode = 'low';
+    let isStreaming = false;
+
+    const panel = document.getElementById('source-panel');
+    const openPanel = document.getElementById('open-panel');
+    const closePanel = document.getElementById('close-panel');
+    const topicSelect = document.getElementById('topic-select');
+    const paperSearch = document.getElementById('paper-search');
+    const paperList = document.getElementById('paper-list');
+    const selectedCount = document.getElementById('selected-count');
+    const chatThread = document.getElementById('chat-thread');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const sendButton = document.getElementById('send-button');
+
+    function matchesTopic(paper) {
+      const topic = topicSelect.value;
+      return topic === 'all' || paper.tags.includes(topic);
+    }
+
+    function filteredPapers() {
+      const query = paperSearch.value.trim().toLowerCase();
+      return papers.filter((paper) => {
+        if (!matchesTopic(paper)) return false;
+        if (!query) return true;
+        return paper.title.toLowerCase().includes(query)
+          || paper.path.toLowerCase().includes(query)
+          || paper.tags.join(' ').toLowerCase().includes(query);
+      });
+    }
+
+    function updateSelectedCount() {
+      selectedCount.textContent = `${selected.size}/${maxPapers}`;
+    }
+
+    function renderPaperList() {
+      const visible = filteredPapers();
+      paperList.innerHTML = '';
+      visible.forEach((paper) => {
+        const item = document.createElement('label');
+        item.className = 'paper-check-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selected.has(paper.path);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            if (selected.size >= maxPapers) {
+              checkbox.checked = false;
+              return;
+            }
+            selected.add(paper.path);
+          } else {
+            selected.delete(paper.path);
+          }
+          updateSelectedCount();
+        });
+
+        const body = document.createElement('span');
+        body.className = 'paper-check-body';
+        const title = document.createElement('strong');
+        title.textContent = paper.title;
+        const meta = document.createElement('span');
+        meta.textContent = [paper.year, paper.venue, paper.tags.slice(0, 3).join(', ')].filter(Boolean).join(' · ');
+        body.append(title, meta);
+        item.append(checkbox, body);
+        paperList.appendChild(item);
+      });
+      updateSelectedCount();
+    }
+
+    function selectInitialPapers() {
+      filteredPapers().slice(0, Math.min(12, maxPapers)).forEach((paper) => selected.add(paper.path));
+      renderPaperList();
+    }
+
+    let stickToBottom = true;
+    chatThread.addEventListener('scroll', () => {
+      const slack = chatThread.scrollHeight - chatThread.scrollTop - chatThread.clientHeight;
+      stickToBottom = slack < 80;
+    });
+    function scrollIfSticky() {
+      if (stickToBottom) {
+        chatThread.scrollTop = chatThread.scrollHeight;
+      }
+    }
+
+    function appendMessage(role, text) {
+      const empty = chatThread.querySelector('.chat-empty');
+      if (empty) empty.remove();
+      const row = document.createElement('div');
+      row.className = `chat-message ${role}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      const content = document.createElement('div');
+      content.className = 'chat-content';
+      bubble.appendChild(content);
+      setBubbleContent(bubble, text);
+      row.appendChild(bubble);
+      chatThread.appendChild(row);
+      stickToBottom = true;
+      chatThread.scrollTop = chatThread.scrollHeight;
+      return bubble;
+    }
+
+    const paperByPath = {};
+    const paperByTitle = {};
+    papers.forEach((p) => {
+      paperByPath[p.path] = p;
+      paperByPath[`/page/${p.path}`] = p;
+      paperByTitle[p.title.toLowerCase()] = p;
+    });
+
+    function setBubbleContent(bubble, text) {
+      const content = bubble.querySelector('.chat-content');
+      if (!content) return;
+      content.innerHTML = renderMarkdown(text);
+      if (typeof renderMathInElement === 'function') {
+        renderMathInElement(content, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+      if (bubble.closest('.chat-message.assistant')) {
+        appendSourceChips(bubble, text);
+      }
+    }
+
+    function appendSourceChips(bubble, text) {
+      const existing = bubble.querySelector('.chat-sources');
+      if (existing) existing.remove();
+
+      const referenced = new Map();
+      const lowerText = text.toLowerCase();
+
+      papers.forEach((p) => {
+        if (referenced.has(p.path)) return;
+        const wikiPath = `/page/${p.path}`;
+        if (text.includes(wikiPath) || text.includes(p.path)) {
+          referenced.set(p.path, p);
+        } else if (p.title.length > 15 && lowerText.includes(p.title.toLowerCase())) {
+          referenced.set(p.path, p);
+        }
+      });
+
+      if (referenced.size === 0) return;
+
+      const footer = document.createElement('div');
+      footer.className = 'chat-sources';
+      const label = document.createElement('span');
+      label.className = 'chat-sources-label';
+      label.textContent = 'Sources';
+      footer.appendChild(label);
+
+      referenced.forEach((p, path) => {
+        const chip = document.createElement('a');
+        chip.className = 'chat-source-chip';
+        chip.href = `/page/${path}`;
+        chip.target = '_blank';
+        chip.rel = 'noopener';
+        chip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${escapeHtml(p.title)}</span>`;
+        if (p.year) {
+          const year = document.createElement('span');
+          year.className = 'chat-source-year';
+          year.textContent = p.year;
+          chip.appendChild(year);
+        }
+        footer.appendChild(chip);
+      });
+
+      bubble.appendChild(footer);
+    }
+
+    function appendStatus(bubble, text) {
+      let status = bubble.querySelector('.chat-status');
+      if (!status) {
+        status = document.createElement('div');
+        status.className = 'chat-status';
+        bubble.prepend(status);
+      }
+      status.textContent = text;
+    }
+
+    function autoresize() {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = `${Math.min(chatInput.scrollHeight, 160)}px`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function safeUrl(value) {
+      const trimmed = String(value).trim();
+      if (/^(https?:|\/|#)/i.test(trimmed)) return escapeHtml(trimmed);
+      return '#';
+    }
+
+    function renderInlineMarkdown(value) {
+      const mathSlots = [];
+      let s = String(value);
+      s = s.replace(/\$\$[\s\S]+?\$\$/g, (m) => { mathSlots.push(m); return `\x00M${mathSlots.length - 1}\x00`; });
+      s = s.replace(/\$[^$\n]+\$/g, (m) => { mathSlots.push(m); return `\x00M${mathSlots.length - 1}\x00`; });
+      let html = escapeHtml(s);
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
+        const url = safeUrl(href);
+        const isInternal = url.startsWith('/page/');
+        if (isInternal) {
+          return `<a href="${url}" class="chat-paper-link">${label}</a>`;
+        }
+        return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+      });
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      html = html.replace(/\x00M(\d+)\x00/g, (_m, idx) => mathSlots[parseInt(idx)]);
+      return html;
+    }
+
+    function isTableSeparator(line) {
+      return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+    }
+
+    function splitTableRow(line) {
+      return line
+        .trim()
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => cell.trim());
+    }
+
+    function renderMarkdown(markdown) {
+      if (!markdown) return '';
+      const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+      const html = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          i += 1;
+          continue;
+        }
+
+        if (trimmed.startsWith('```')) {
+          const codeLines = [];
+          i += 1;
+          while (i < lines.length && !lines[i].trim().startsWith('```')) {
+            codeLines.push(lines[i]);
+            i += 1;
+          }
+          if (i < lines.length) i += 1;
+          html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+          continue;
+        }
+
+        if (trimmed.startsWith('$$') && !trimmed.endsWith('$$')) {
+          const mathLines = [line];
+          i += 1;
+          while (i < lines.length && !lines[i].trim().endsWith('$$')) {
+            mathLines.push(lines[i]);
+            i += 1;
+          }
+          if (i < lines.length) { mathLines.push(lines[i]); i += 1; }
+          html.push(`<div class="chat-math-block">${mathLines.join('\n')}</div>`);
+          continue;
+        }
+        if (trimmed.startsWith('$$') && trimmed.endsWith('$$') && trimmed.length > 4) {
+          html.push(`<div class="chat-math-block">${trimmed}</div>`);
+          i += 1;
+          continue;
+        }
+
+        if (i + 1 < lines.length && line.includes('|') && isTableSeparator(lines[i + 1])) {
+          const headers = splitTableRow(line);
+          i += 2;
+          const rows = [];
+          while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+            rows.push(splitTableRow(lines[i]));
+            i += 1;
+          }
+          html.push('<div class="chat-table-wrap"><table><thead><tr>');
+          headers.forEach((header) => html.push(`<th>${renderInlineMarkdown(header)}</th>`));
+          html.push('</tr></thead><tbody>');
+          rows.forEach((row) => {
+            html.push('<tr>');
+            headers.forEach((_header, index) => html.push(`<td>${renderInlineMarkdown(row[index] || '')}</td>`));
+            html.push('</tr>');
+          });
+          html.push('</tbody></table></div>');
+          continue;
+        }
+
+        const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+        if (heading) {
+          const level = heading[1].length + 2;
+          html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+          i += 1;
+          continue;
+        }
+
+        if (/^[-*]\s+/.test(trimmed)) {
+          html.push('<ul>');
+          while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+            html.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^[-*]\s+/, ''))}</li>`);
+            i += 1;
+          }
+          html.push('</ul>');
+          continue;
+        }
+
+        if (/^\d+\.\s+/.test(trimmed)) {
+          html.push('<ol>');
+          while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+            html.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^\d+\.\s+/, ''))}</li>`);
+            i += 1;
+          }
+          html.push('</ol>');
+          continue;
+        }
+
+        const paragraph = [trimmed];
+        i += 1;
+        while (
+          i < lines.length
+          && lines[i].trim()
+          && !lines[i].trim().startsWith('```')
+          && !lines[i].trim().startsWith('$$')
+          && !(i + 1 < lines.length && lines[i].includes('|') && isTableSeparator(lines[i + 1]))
+          && !/^(#{1,3})\s+/.test(lines[i].trim())
+          && !/^[-*]\s+/.test(lines[i].trim())
+          && !/^\d+\.\s+/.test(lines[i].trim())
+        ) {
+          paragraph.push(lines[i].trim());
+          i += 1;
+        }
+        html.push(`<p>${renderInlineMarkdown(paragraph.join(' '))}</p>`);
+      }
+
+      return html.join('');
+    }
+
+    async function sendMessage(event) {
+      event.preventDefault();
+      if (isStreaming) return;
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      isStreaming = true;
+      sendButton.disabled = true;
+      chatInput.value = '';
+      autoresize();
+
+      appendMessage('user', message);
+      const assistantBubble = appendMessage('assistant', '');
+      let assistantText = '';
+
+      try {
+        const response = await fetch('{{ url_for("chat_stream") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            history: conversation.slice(-10),
+            paper_paths: Array.from(selected),
+            thinking_mode: thinkingMode,
+          }),
+        });
+
+        if (!response.ok || !response.body) {
+          const error = await response.json().catch(() => ({ error: response.statusText }));
+          throw new Error(error.error || response.statusText);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+          for (const rawEvent of events) {
+            const lines = rawEvent.split('\n');
+            const eventName = (lines.find((line) => line.startsWith('event:')) || 'event: message').slice(6).trim();
+            const dataLine = lines.find((line) => line.startsWith('data:'));
+            const data = dataLine ? JSON.parse(dataLine.slice(5).trim()) : {};
+            if (eventName === 'token') {
+              assistantText += data.text || '';
+              setBubbleContent(assistantBubble, assistantText);
+              scrollIfSticky();
+            } else if (eventName === 'status') {
+              appendStatus(assistantBubble, data.message || '');
+            } else if (eventName === 'error') {
+              throw new Error(data.message || 'DeepSeek request failed');
+            }
+          }
+        }
+
+        conversation.push({ role: 'user', content: message });
+        conversation.push({ role: 'assistant', content: assistantText });
+      } catch (error) {
+        setBubbleContent(assistantBubble, `Error: ${error.message}`);
+        assistantBubble.classList.add('error');
+      } finally {
+        isStreaming = false;
+        sendButton.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    openPanel.addEventListener('click', () => panel.classList.add('open'));
+    closePanel.addEventListener('click', () => panel.classList.remove('open'));
+    topicSelect.addEventListener('change', () => {
+      selected.clear();
+      selectInitialPapers();
+    });
+    paperSearch.addEventListener('input', renderPaperList);
+    document.getElementById('select-visible').addEventListener('click', () => {
+      for (const paper of filteredPapers()) {
+        if (selected.size >= maxPapers) break;
+        selected.add(paper.path);
+      }
+      renderPaperList();
+    });
+    document.getElementById('clear-selected').addEventListener('click', () => {
+      selected.clear();
+      renderPaperList();
+    });
+    document.querySelectorAll('[data-thinking]').forEach((button) => {
+      button.addEventListener('click', () => {
+        thinkingMode = button.dataset.thinking;
+        document.querySelectorAll('[data-thinking]').forEach((b) => b.classList.toggle('active', b === button));
+      });
+    });
+    chatInput.addEventListener('input', autoresize);
+    chatInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        chatForm.requestSubmit();
+      }
+    });
+    chatForm.addEventListener('submit', sendMessage);
+
+    if (window.matchMedia('(max-width: 980px)').matches) {
+      panel.classList.remove('open');
+    }
+    topicSelect.value = 'all';
+    selectInitialPapers();
+  </script>
+{% endblock %}

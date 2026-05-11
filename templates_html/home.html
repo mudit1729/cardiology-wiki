@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Home | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="featured-section hero-featured">
+    <div class="section-heading">
+      <h2>Entry Points</h2>
+      <p class="eyebrow" style="margin:0">PCI &middot; ACS &middot; Structural &middot; Antiplatelets &middot; Heart Failure &middot; Prevention</p>
+    </div>
+    <div class="featured-grid">
+      {% for page in featured %}
+        <a class="featured-card" href="{{ url_for('page', page_path=page.path) }}">
+          <strong>{{ page.title }}</strong>
+          {% if page.status %}
+            <span class="status-dot status-{{ page.status }}"></span>
+          {% endif %}
+          <p>{{ page.excerpt }}</p>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="collections-section">
+    <div class="section-heading">
+      <h2>Trial Collections</h2>
+      <a href="{{ url_for('papers') }}" class="see-all">View all trials &rarr;</a>
+    </div>
+    <div class="collection-grid">
+      {% for name, papers in collections.items() %}
+        <div class="collection-card">
+          <div class="collection-header">
+            <h3>{{ name }}</h3>
+            <span class="badge">{{ papers|length }}</span>
+          </div>
+          <ul class="collection-list">
+            {% for p in papers[:5] %}
+              <li>
+                <a href="{{ url_for('page', page_path=p.path) }}">{{ p.title }}</a>
+                {% if p.year %}<span class="year-tag">{{ p.year }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if papers|length > 5 %}
+            <p class="more-count">+{{ papers|length - 5 }} more</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.trials }}</span>
+      <span class="stat-label">Trials</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.guidelines }}</span>
+      <span class="stat-label">Guidelines</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.procedures }}</span>
+      <span class="stat-label">Procedures</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.conferences }}</span>
+      <span class="stat-label">Conferences</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.concepts }}</span>
+      <span class="stat-label">Concepts</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">{{ stats.tags }}</span>
+      <span class="stat-label">Tags</span>
+    </div>
+  </div>
+
+  <section class="admin-panel" style="margin-bottom:2rem;">
+    <details class="section-block">
+      <summary class="section-title" style="cursor:pointer;">
+        <h3>Admin</h3>
+        <span class="badge">citations</span>
+      </summary>
+      <div style="padding:1rem;">
+        <p id="citation-status" style="margin-bottom:0.75rem;color:var(--text-muted);">Loading status...</p>
+        <button id="btn-update-citations" onclick="triggerCitationUpdate()" style="padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);cursor:pointer;font-weight:500;">
+          Update Citations Now
+        </button>
+      </div>
+      <script>
+        async function loadCitationStatus() {
+          try {
+            const resp = await fetch('/api/citations/status');
+            const data = await resp.json();
+            const el = document.getElementById('citation-status');
+            if (data.running) {
+              el.textContent = 'Citation update running...';
+              el.style.color = 'var(--accent)';
+            } else if (data.last_run) {
+              const d = new Date(data.last_run);
+              const r = data.last_result || {};
+              el.textContent = `Last run: ${d.toLocaleDateString()} ${d.toLocaleTimeString()} — ${r.updated || 0} updated, ${r.unchanged || 0} unchanged, ${r.not_found || 0} not found`;
+              el.style.color = 'var(--text-muted)';
+            } else {
+              el.textContent = 'Never run yet.';
+            }
+          } catch(e) {
+            document.getElementById('citation-status').textContent = 'Could not load status.';
+          }
+        }
+        async function triggerCitationUpdate() {
+          const btn = document.getElementById('btn-update-citations');
+          btn.disabled = true;
+          btn.textContent = 'Running...';
+          try {
+            const resp = await fetch('/api/citations/trigger', {method:'POST'});
+            const data = await resp.json();
+            if (data.error) {
+              alert('Error: ' + data.error);
+            } else {
+              document.getElementById('citation-status').textContent = 'Citation update started...';
+              document.getElementById('citation-status').style.color = 'var(--accent)';
+              const poll = setInterval(async () => {
+                const s = await (await fetch('/api/citations/status')).json();
+                if (!s.running) {
+                  clearInterval(poll);
+                  loadCitationStatus();
+                  btn.disabled = false;
+                  btn.textContent = 'Update Citations Now';
+                }
+              }, 5000);
+            }
+          } catch(e) {
+            alert('Request failed');
+          }
+          btn.disabled = false;
+          btn.textContent = 'Update Citations Now';
+        }
+        loadCitationStatus();
+      </script>
+    </details>
+  </section>
+
+  <section class="grid two-up">
+    <div class="panel">
+      <div class="section-heading">
+        <h2>Sections</h2>
+      </div>
+      <div class="section-list">
+        {% for label, pages in groups.items() %}
+          <details class="section-block" {% if label in ['Concepts', 'Trials', 'Guidelines', 'Procedures'] %}open{% endif %}>
+            <summary class="section-title">
+              <h3>{{ label }}</h3>
+              <span class="badge">{{ pages|length }}</span>
+            </summary>
+            <ul>
+              {% for page in pages %}
+                <li>
+                  <a href="{{ url_for('page', page_path=page.path) }}">{{ page.title }}</a>
+                  {% if page.status %}<span class="status-dot status-{{ page.status }}"></span>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-heading">
+        <h2>Recent Activity</h2>
+      </div>
+      <div class="activity-list">
+        {% for entry in recent %}
+          <article class="activity-item">
+            <span class="activity-date">{{ entry.date }}</span>
+            <div>
+              <span class="activity-kind">{{ entry.kind }}</span>
+              <p>{{ entry.title }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

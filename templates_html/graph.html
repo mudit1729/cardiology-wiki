@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block title %}Trial Graph | {{ repo_title }}{% endblock %}
+
+{% block content %}
+  <section class="graph-page">
+    <div class="graph-header">
+      <div class="section-heading">
+        <h1>Trial Graph</h1>
+        <p class="muted">Click a trial to explore its neighborhood. Double-click to open.</p>
+      </div>
+      <div class="graph-search-wrap">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="graph-search" placeholder="Search trials..." autocomplete="off">
+        <div class="graph-search-dropdown" id="search-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="graph-controls">
+      <button class="chip active" data-group="all">All</button>
+      <button class="chip" data-group="stable-cad">Stable CAD</button>
+      <button class="chip" data-group="acs">ACS/STEMI</button>
+      <button class="chip" data-group="imaging">Imaging PCI</button>
+      <button class="chip" data-group="physiology">Physiology PCI</button>
+      <button class="chip" data-group="antiplatelet">Antiplatelets</button>
+      <button class="chip" data-group="af-pci">AF+PCI</button>
+      <button class="chip" data-group="structural">Structural</button>
+      <button class="chip" data-group="prevention">Prevention</button>
+      <button class="chip" data-group="heart-failure">Heart Failure</button>
+      <button class="chip" data-group="procedure">Procedures</button>
+      <button class="chip" data-group="guideline">Guidelines</button>
+      <button class="chip" data-group="conference">Conferences</button>
+    </div>
+
+    <div class="graph-stats" id="graph-stats"></div>
+
+    <div class="graph-container" id="graph-container">
+      <svg id="graph-svg">
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="cluster-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="30"/>
+          </filter>
+        </defs>
+      </svg>
+
+      <div class="graph-focus-panel" id="focus-panel">
+        <button class="focus-close" id="focus-close">&times;</button>
+        <h4 id="focus-title"></h4>
+        <div class="focus-meta" id="focus-meta"></div>
+        <a class="focus-link" id="focus-link" href="#">Open page &rarr;</a>
+        <div class="focus-neighbors">
+          <p class="focus-neighbors-label">Connected pages</p>
+          <ul id="focus-neighbor-list"></ul>
+        </div>
+      </div>
+
+      <div class="graph-legend-inline" id="graph-legend"></div>
+    </div>
+
+    <div class="graph-tooltip" id="graph-tooltip"></div>
+  </section>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    const graphData = {{ graph_json | safe }};
+    const groupColors = {
+      'stable-cad':    '#f59e0b',
+      'acs':           '#ef4444',
+      'imaging':       '#3b82f6',
+      'physiology':    '#8b5cf6',
+      'antiplatelet':  '#ec4899',
+      'af-pci':        '#f97316',
+      'structural':    '#06b6d4',
+      'prevention':    '#10b981',
+      'heart-failure': '#14b8a6',
+      'procedure':     '#6366f1',
+      'guideline':     '#a855f7',
+      'conference':    '#eab308',
+      'other':         '#6b7280',
+    };
+    const groupNames = {
+      'stable-cad':    'Stable CAD',
+      'acs':           'ACS/STEMI',
+      'imaging':       'Imaging PCI',
+      'physiology':    'Physiology PCI',
+      'antiplatelet':  'Antiplatelets',
+      'af-pci':        'AF+PCI',
+      'structural':    'Structural',
+      'prevention':    'Prevention',
+      'heart-failure': 'Heart Failure',
+      'procedure':     'Procedures',
+      'guideline':     'Guidelines',
+      'conference':    'Conferences',
+      'other':         'Other',
+    };
+
+    const container = document.getElementById('graph-container');
+    const svg = d3.select('#graph-svg');
+    const tooltip = document.getElementById('graph-tooltip');
+    const focusPanel = document.getElementById('focus-panel');
+    const searchInput = document.getElementById('graph-search');
+    const searchDropdown = document.getElementById('search-dropdown');
+    let width = container.clientWidth;
+    let height = Math.max(650, window.innerHeight - 260);
+    svg.attr('width', width).attr('height', height);
+
+    const nodes = graphData.nodes.map(d => ({...d}));
+    const edges = graphData.edges.map(d => ({...d}));
+
+    const connCount = {};
+    edges.forEach(e => {
+      connCount[e.source] = (connCount[e.source] || 0) + 1;
+      connCount[e.target] = (connCount[e.target] || 0) + 1;
+    });
+
+    document.getElementById('graph-stats').innerHTML =
+      `<span><strong>${nodes.length}</strong> pages</span>` +
+      `<span>&middot;</span>` +
+      `<span><strong>${edges.length}</strong> connections</span>` +
+      `<span>&middot;</span>` +
+      `<span><strong>${Object.keys(groupColors).length - 1}</strong> domains</span>`;
+
+    const legendEl = document.getElementById('graph-legend');
+    Object.entries(groupColors).forEach(([key, color]) => {
+      if (key === 'other') return;
+      const count = nodes.filter(n => n.group === key).length;
+      if (count === 0) return;
+      legendEl.innerHTML += `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${groupNames[key]} <span class="legend-count">${count}</span></span>`;
+    });
+
+    const activeGroups = [...new Set(nodes.map(n => n.group))];
+    const groupCenters = {};
+    activeGroups.forEach((g, i) => {
+      const angle = (2 * Math.PI * i) / activeGroups.length - Math.PI / 2;
+      const radius = Math.min(width, height) * 0.28;
+      groupCenters[g] = {
+        x: width / 2 + radius * Math.cos(angle),
+        y: height / 2 + radius * Math.sin(angle),
+      };
+    });
+
+    const g = svg.append('g');
+    const clusterLayer = g.append('g').attr('class', 'layer-clusters');
+    const edgeLayer     = g.append('g').attr('class', 'layer-edges');
+    const nodeLayer     = g.append('g').attr('class', 'layer-nodes');
+    const labelLayer    = g.append('g').attr('class', 'layer-labels');
+    const watermarkLayer = g.append('g').attr('class', 'layer-watermarks');
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.15, 5])
+      .on('zoom', (event) => g.attr('transform', event.transform));
+    svg.call(zoom);
+
+    const simulation = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(edges).id(d => d.id).distance(60).strength(0.4))
+      .force('charge', d3.forceManyBody().strength(-120).distanceMax(350))
+      .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 4))
+      .force('clusterX', d3.forceX(d => groupCenters[d.group]?.x || width / 2).strength(0.18))
+      .force('clusterY', d3.forceY(d => groupCenters[d.group]?.y || height / 2).strength(0.18));
+
+    simulation.stop();
+    for (let i = 0; i < 300; i++) simulation.tick();
+
+    const link = edgeLayer.selectAll('line')
+      .data(edges)
+      .join('line')
+      .attr('class', 'graph-link')
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+
+    const node = nodeLayer.selectAll('circle')
+      .data(nodes)
+      .join('circle')
+      .attr('class', 'graph-node')
+      .attr('r', d => nodeRadius(d))
+      .attr('fill', d => groupColors[d.group] || groupColors.other)
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y)
+      .call(d3.drag()
+        .on('start', dragStarted)
+        .on('drag', dragged)
+        .on('end', dragEnded));
+
+    function isLandmark(d) {
+      return (d.citations || 0) > 3000 || (connCount[d.id] || 0) >= 8;
+    }
+
+    const label = labelLayer.selectAll('text.graph-label')
+      .data(nodes.filter(isLandmark))
+      .join('text')
+      .attr('class', 'graph-label')
+      .text(d => truncate(d.title, 28))
+      .attr('x', d => d.x)
+      .attr('y', d => d.y)
+      .attr('dx', d => nodeRadius(d) + 4)
+      .attr('dy', 3);
+
+    const landmarkIds = new Set(nodes.filter(isLandmark).map(n => n.id));
+    const focusLabel = labelLayer.selectAll('text.graph-focus-label')
+      .data(nodes.filter(n => !landmarkIds.has(n.id)))
+      .join('text')
+      .attr('class', 'graph-label graph-focus-label')
+      .text(d => truncate(d.title, 32))
+      .attr('x', d => d.x)
+      .attr('y', d => d.y)
+      .attr('dx', d => nodeRadius(d) + 4)
+      .attr('dy', 3)
+      .attr('opacity', 0);
+
+    const settledCenters = {};
+    activeGroups.forEach(grp => {
+      const grpNodes = nodes.filter(n => n.group === grp);
+      if (grpNodes.length === 0) return;
+      settledCenters[grp] = {
+        x: d3.mean(grpNodes, n => n.x),
+        y: d3.mean(grpNodes, n => n.y),
+      };
+    });
+
+    watermarkLayer.selectAll('text')
+      .data(Object.entries(settledCenters))
+      .join('text')
+      .attr('class', 'graph-watermark')
+      .text(([grp]) => groupNames[grp] || grp)
+      .attr('x', ([, pos]) => pos.x)
+      .attr('y', ([, pos]) => pos.y)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle');
+
+    activeGroups.forEach(grp => {
+      const grpNodes = nodes.filter(n => n.group === grp);
+      if (grpNodes.length < 2) return;
+      const cx = d3.mean(grpNodes, n => n.x);
+      const cy = d3.mean(grpNodes, n => n.y);
+      const maxDist = d3.max(grpNodes, n =>
+        Math.sqrt((n.x - cx) ** 2 + (n.y - cy) ** 2)
+      ) || 50;
+      clusterLayer.append('circle')
+        .attr('cx', cx)
+        .attr('cy', cy)
+        .attr('r', maxDist + 30)
+        .attr('fill', groupColors[grp] || groupColors.other)
+        .attr('opacity', 0.04)
+        .attr('filter', 'url(#cluster-blur)');
+    });
+
+    simulation.alpha(0.08).restart();
+
+    simulation.on('tick', () => {
+      link
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      node.attr('cx', d => d.x).attr('cy', d => d.y);
+      label.attr('x', d => d.x).attr('y', d => d.y);
+      focusLabel.attr('x', d => d.x).attr('y', d => d.y);
+    });
+
+    function nodeRadius(d) {
+      const c = d.citations || 0;
+      if (c > 10000) return 18;
+      if (c > 5000) return 14;
+      if (c > 1000) return 11;
+      if (c > 100) return 8;
+      return 6;
+    }
+
+    function truncate(s, n) {
+      return s.length > n ? s.substring(0, n) + '...' : s;
+    }
+
+    function dragStarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.2).restart();
+      d.fx = d.x; d.fy = d.y;
+    }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+    function dragEnded(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null; d.fy = null;
+    }
+
+    const adjacency = {};
+    nodes.forEach(n => adjacency[n.id] = new Set());
+    edges.forEach(e => {
+      const src = typeof e.source === 'object' ? e.source.id : e.source;
+      const tgt = typeof e.target === 'object' ? e.target.id : e.target;
+      adjacency[src].add(tgt);
+      adjacency[tgt].add(src);
+    });
+
+    let focusedId = null;
+    let activeFilter = 'all';
+
+    function focusNode(d) {
+      focusedId = d.id;
+      const neighbors = new Set([d.id, ...adjacency[d.id]]);
+
+      node.transition().duration(250)
+        .attr('opacity', n => neighbors.has(n.id) ? 1 : 0.06)
+        .attr('filter', n => n.id === d.id ? 'url(#glow)' : null);
+
+      link.transition().duration(250)
+        .style('stroke-opacity', e => {
+          const s = typeof e.source === 'object' ? e.source.id : e.source;
+          const t = typeof e.target === 'object' ? e.target.id : e.target;
+          return (s === d.id || t === d.id) ? 1 : 0.03;
+        })
+        .style('stroke-width', e => {
+          const s = typeof e.source === 'object' ? e.source.id : e.source;
+          const t = typeof e.target === 'object' ? e.target.id : e.target;
+          return (s === d.id || t === d.id) ? 2.8 : 0.6;
+        });
+
+      label.transition().duration(250)
+        .attr('opacity', n => neighbors.has(n.id) ? 1 : 0.03);
+
+      focusLabel.transition().duration(250)
+        .attr('opacity', n => neighbors.has(n.id) ? 1 : 0);
+
+      const neighborNodes = [...adjacency[d.id]]
+        .map(id => nodes.find(n => n.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (b.citations || 0) - (a.citations || 0));
+
+      document.getElementById('focus-title').textContent = d.title;
+      document.getElementById('focus-meta').innerHTML = [
+        d.year ? `<span class="meta-pill small">${d.year}</span>` : '',
+        d.citations ? `<span class="meta-pill small">${d.citations.toLocaleString()} citations</span>` : '',
+        `<span class="meta-pill small" style="background:${groupColors[d.group]}22;color:${groupColors[d.group]}">${groupNames[d.group]}</span>`,
+      ].join('');
+      document.getElementById('focus-link').href = d.url;
+
+      const list = document.getElementById('focus-neighbor-list');
+      list.innerHTML = neighborNodes.slice(0, 15).map(n =>
+        `<li>
+          <a href="javascript:void(0)" data-id="${n.id}">${truncate(n.title, 42)}</a>
+          ${n.year ? `<span class="year-tag">${n.year}</span>` : ''}
+        </li>`
+      ).join('');
+      if (neighborNodes.length > 15) {
+        list.innerHTML += `<li class="more-label">+${neighborNodes.length - 15} more</li>`;
+      }
+
+      list.querySelectorAll('a[data-id]').forEach(a => {
+        a.addEventListener('click', () => {
+          const target = nodes.find(n => n.id === a.dataset.id);
+          if (target) { focusNode(target); zoomToNode(target); }
+        });
+      });
+
+      focusPanel.classList.add('active');
+      tooltip.style.display = 'none';
+    }
+
+    function clearFocus() {
+      focusedId = null;
+      focusPanel.classList.remove('active');
+      applyFilter(activeFilter);
+    }
+
+    function zoomToNode(d) {
+      const scale = 2;
+      const transform = d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(scale)
+        .translate(-d.x, -d.y);
+      svg.transition().duration(600).call(zoom.transform, transform);
+    }
+
+    node
+      .on('mouseover', function(event, d) {
+        if (focusedId) return;
+        tooltip.innerHTML = `
+          <strong>${d.title}</strong>
+          ${d.year ? `<span class="meta-pill small">${d.year}</span>` : ''}
+          ${d.citations ? `<span class="meta-pill small">${d.citations.toLocaleString()} citations</span>` : ''}
+          <div style="margin-top:4px;font-size:0.78rem;color:var(--text-tertiary)">${(connCount[d.id] || 0)} connections &middot; ${groupNames[d.group]}</div>
+        `;
+        tooltip.style.display = 'block';
+        tooltip.style.left = event.pageX + 14 + 'px';
+        tooltip.style.top = event.pageY - 14 + 'px';
+        d3.select(this).attr('stroke', '#fff').attr('stroke-width', 2.5);
+      })
+      .on('mousemove', function(event) {
+        tooltip.style.left = event.pageX + 14 + 'px';
+        tooltip.style.top = event.pageY - 14 + 'px';
+      })
+      .on('mouseout', function() {
+        tooltip.style.display = 'none';
+        if (!focusedId || this.__data__.id !== focusedId) {
+          d3.select(this).attr('stroke', null).attr('stroke-width', null);
+        }
+      })
+      .on('click', function(event, d) {
+        event.stopPropagation();
+        focusNode(d);
+      })
+      .on('dblclick', function(event, d) {
+        event.stopPropagation();
+        window.location.href = d.url;
+      });
+
+    svg.on('click', () => { if (focusedId) clearFocus(); });
+
+    document.getElementById('focus-close').addEventListener('click', clearFocus);
+
+    function applyFilter(group) {
+      activeFilter = group;
+      focusedId = null;
+      focusPanel.classList.remove('active');
+
+      const nodeSet = new Set();
+      nodes.forEach(d => { if (group === 'all' || d.group === group) nodeSet.add(d.id); });
+      const neighborSet = new Set(nodeSet);
+      if (group !== 'all') {
+        edges.forEach(e => {
+          const s = typeof e.source === 'object' ? e.source.id : e.source;
+          const t = typeof e.target === 'object' ? e.target.id : e.target;
+          if (nodeSet.has(s)) neighborSet.add(t);
+          if (nodeSet.has(t)) neighborSet.add(s);
+        });
+      }
+      node.transition().duration(300)
+        .attr('opacity', d => {
+          if (group === 'all' || nodeSet.has(d.id)) return 1;
+          if (neighborSet.has(d.id)) return 0.55;
+          return 0.06;
+        })
+        .attr('filter', null);
+
+      link.transition().duration(300)
+        .style('stroke-opacity', d => {
+          const s = typeof d.source === 'object' ? d.source.id : d.source;
+          const t = typeof d.target === 'object' ? d.target.id : d.target;
+          if (group === 'all') return 0.85;
+          const inA = nodeSet.has(s), inB = nodeSet.has(t);
+          if (inA && inB) return 0.95;
+          if (inA || inB) return 0.45;
+          return 0.05;
+        })
+        .style('stroke-width', d => {
+          const s = typeof d.source === 'object' ? d.source.id : d.source;
+          const t = typeof d.target === 'object' ? d.target.id : d.target;
+          if (group === 'all') return 1.2;
+          const inA = nodeSet.has(s), inB = nodeSet.has(t);
+          return (inA && inB) ? 1.6 : (inA || inB) ? 1.0 : 0.6;
+        });
+
+      label.transition().duration(300)
+        .attr('opacity', d => (group === 'all' || d.group === group) ? 1 : 0.03);
+
+      focusLabel.transition().duration(300).attr('opacity', 0);
+    }
+
+    document.querySelectorAll('.graph-controls .chip').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.graph-controls .chip').forEach(el => el.classList.remove('active'));
+        this.classList.add('active');
+        applyFilter(this.dataset.group);
+      });
+    });
+
+    const sortedTitles = nodes.map(n => ({ id: n.id, title: n.title }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase().trim();
+      if (!q) {
+        searchDropdown.classList.remove('open');
+        clearFocus();
+        return;
+      }
+
+      const matches = sortedTitles.filter(n => n.title.toLowerCase().includes(q)).slice(0, 8);
+      if (matches.length === 0) {
+        searchDropdown.classList.remove('open');
+        return;
+      }
+
+      searchDropdown.innerHTML = matches.map(m =>
+        `<div class="search-item" data-id="${m.id}">${highlightMatch(m.title, q)}</div>`
+      ).join('');
+      searchDropdown.classList.add('open');
+
+      searchDropdown.querySelectorAll('.search-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const target = nodes.find(n => n.id === item.dataset.id);
+          if (target) {
+            searchInput.value = target.title;
+            searchDropdown.classList.remove('open');
+            focusNode(target);
+            zoomToNode(target);
+          }
+        });
+      });
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        searchInput.value = '';
+        searchDropdown.classList.remove('open');
+        clearFocus();
+        searchInput.blur();
+      }
+      if (e.key === 'Enter') {
+        const q = searchInput.value.toLowerCase().trim();
+        const match = nodes.find(n => n.title.toLowerCase().includes(q));
+        if (match) {
+          searchInput.value = match.title;
+          searchDropdown.classList.remove('open');
+          focusNode(match);
+          zoomToNode(match);
+        }
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.graph-search-wrap')) {
+        searchDropdown.classList.remove('open');
+      }
+    });
+
+    function highlightMatch(title, query) {
+      const idx = title.toLowerCase().indexOf(query);
+      if (idx < 0) return title;
+      return title.substring(0, idx) +
+        '<mark>' + title.substring(idx, idx + query.length) + '</mark>' +
+        title.substring(idx + query.length);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+      }
+      if (e.key === 'Escape') {
+        clearFocus();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      width = container.clientWidth;
+      height = Math.max(650, window.innerHeight - 260);
+      svg.attr('width', width).attr('height', height);
+    });
+
+  })();
+  </script>
+{% endblock %}

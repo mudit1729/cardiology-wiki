@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+*.egg-info/
+dist/
+build/
+raw/inbox/*
+raw/papers/*
+.grounding/
+*.log
+/tmp/
