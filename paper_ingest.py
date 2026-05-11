@@ -206,6 +206,146 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
         return None
 
 
+# Citation patterns in PDF headers (most reliable signal of publication year + venue).
+# Matches "Open Heart 2022;9:e001887", "European Heart Journal (2015) 36, 3346-3355",
+# "BMJ Open 2023;13:e076781", "Eur Heart J. 2015 Dec 14; 36(47):3346-3355", etc.
+JOURNAL_CITE_PATTERNS = [
+    # "Journal YEAR;Vol:..."  e.g. "Open Heart 2022;9:e001887"
+    re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z]?[A-Za-z]+){0,5})\s+(\d{4})\s*[;:]\s*\d"),
+    # "Journal (YEAR) Vol, ..."  e.g. "European Heart Journal (2015) 36, 3346"
+    re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z]?[A-Za-z]+){0,5})\s+\((\d{4})\)\s+\d"),
+    # "Journal Vol (YEAR) Pages"  e.g. "Indian Heart Journal 74 (2022) 363–368"
+    re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z]?[A-Za-z]+){1,5})\s+\d+\s+\((\d{4})\)\s+\d"),
+    # "Journal YEAR Mon DD;Vol(Iss):..." e.g. "Indian Heart J. 2022 Aug 22 Sep-Oct;"
+    re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z]?[A-Za-z]+){0,5})\.\s+(\d{4})\s+[A-Z][a-z]{2,9}\s+\d"),
+    # Citation in body: "Journal Vol(Iss): ePage" e.g. "PLoS ONE 17(1): e0260770"
+    re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z][A-Za-z]+){0,5})\s+\d+\s*\(\s*\d+\s*\)\s*:\s*e?\d+"),
+]
+# Pattern to extract just the year when matched a venue-only pattern (PLOS ONE case)
+PUBLISHED_DATE_RE = re.compile(r"Published:?\s+[A-Za-z]+\s+\d{1,2}[,\s]+(\d{4})", re.IGNORECASE)
+# Publication year (prefer pub date, NOT received/accepted)
+PUB_YEAR_RE = re.compile(
+    r"(?:Published(?:\s+online)?|©|\(c\)|Copyright)[^\d]{0,50}(20[0-2]\d)",
+    re.IGNORECASE,
+)
+# Year embedded in DOI suffix: "10.1136/openhrt-2021-001887" → 2021
+DOI_YEAR_RE = re.compile(r"doi[:.\s]*10\.\d{4,9}/[a-zA-Z._\-]+[-_](20[0-2]\d)[-_]")
+ANY_YEAR_RE = re.compile(r"\b(20[0-2]\d)\b")
+
+# Filter out false-positive "venues" that are actually month names or other words
+VENUE_BLACKLIST = {
+    "january", "february", "march", "april", "may", "june", "july", "august",
+    "september", "october", "november", "december",
+    "received", "accepted", "published", "online", "abstract", "introduction",
+    "methods", "results", "discussion", "conclusions", "background",
+}
+
+
+def _looks_like_venue(s: str) -> bool:
+    s_low = s.strip().lower()
+    if s_low in VENUE_BLACKLIST:
+        return False
+    if any(w in VENUE_BLACKLIST for w in s_low.split()):
+        # First word is a month/section name - bad
+        if s_low.split()[0] in VENUE_BLACKLIST:
+            return False
+    return True
+
+
+def extract_metadata_from_ocr(ocr_md: str) -> dict:
+    """Pull year and venue from the OCR header. Returns {year: int|None, venue: str|None}."""
+    out: dict = {"year": None, "venue": None}
+    head = ocr_md[:6000]
+
+    # Try journal-citation patterns (highest signal for both year + venue)
+    for pat in JOURNAL_CITE_PATTERNS:
+        for m in pat.finditer(head):
+            venue = m.group(1).rstrip(".").strip()
+            if not _looks_like_venue(venue):
+                continue
+            year = None
+            if m.lastindex and m.lastindex >= 2:
+                try:
+                    y = int(m.group(2))
+                    if 1990 <= y <= 2030:
+                        year = y
+                except (ValueError, IndexError):
+                    pass
+            # Year-only fallback for venue-only patterns (e.g. "PLoS ONE 17(1): e0260770")
+            if year is None:
+                m2 = PUBLISHED_DATE_RE.search(head)
+                if m2:
+                    try:
+                        y = int(m2.group(1))
+                        if 1990 <= y <= 2030:
+                            year = y
+                    except ValueError:
+                        pass
+            if venue and year:
+                out["venue"] = venue
+                out["year"] = year
+                return out
+            elif venue and not out["venue"]:
+                out["venue"] = venue  # keep searching for year
+
+    # Year fallback: prefer "Published YEAR" / "© YEAR" over "Received YEAR"
+    m = PUB_YEAR_RE.search(head)
+    if m:
+        try:
+            y = int(m.group(1))
+            if 1990 <= y <= 2030:
+                out["year"] = y
+                return out
+        except ValueError:
+            pass
+
+    # Year fallback: extract from DOI suffix (e.g. "openhrt-2021-001887")
+    m = DOI_YEAR_RE.search(head)
+    if m:
+        try:
+            y = int(m.group(1))
+            if 1990 <= y <= 2030:
+                out["year"] = y
+                return out
+        except ValueError:
+            pass
+
+    # Last resort: most common year in the first 2000 chars
+    years = ANY_YEAR_RE.findall(head[:2000])
+    if years:
+        from collections import Counter
+        out["year"] = int(Counter(years).most_common(1)[0][0])
+    return out
+
+
+def xai_year_estimate(title: str) -> int | None:
+    """Ask Grok for the publication year of a paper. Returns 4-digit int or None."""
+    key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
+    if not key:
+        return None
+    prompt = (
+        f"What year was the paper titled \"{title}\" published? "
+        "Return ONLY a 4-digit year (1990-2030) or the word UNKNOWN. No other text."
+    )
+    try:
+        resp = requests.post(
+            "https://api.x.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={
+                "model": "grok-3",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 16,
+                "temperature": 0,
+            },
+            timeout=60,
+        )
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+        m = re.search(r"\b(19[89]\d|20[0-3]\d)\b", text)
+        return int(m.group(1)) if m else None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # 4. DeepSeek summarization
 # ---------------------------------------------------------------------------
@@ -432,6 +572,25 @@ def ingest_pipeline(
         else:
             yield _event("status", stage="citation",
                          message=f"Found: {metadata.get('title','?')[:80]} · {metadata.get('citations',0)} citations")
+
+        # Backfill year/venue from OCR header, then Grok, if Semantic Scholar didn't have them
+        if not metadata.get("year") or not metadata.get("venue"):
+            ocr_meta = extract_metadata_from_ocr(ocr_md)
+            if not metadata.get("year") and ocr_meta.get("year"):
+                metadata["year"] = ocr_meta["year"]
+                yield _event("status", stage="citation",
+                             message=f"Year from OCR header: {ocr_meta['year']}")
+            if not metadata.get("venue") and ocr_meta.get("venue"):
+                metadata["venue"] = ocr_meta["venue"]
+                yield _event("status", stage="citation",
+                             message=f"Venue from OCR header: {ocr_meta['venue']}")
+        if not metadata.get("year") and metadata.get("title"):
+            yr = xai_year_estimate(metadata["title"])
+            if yr:
+                metadata["year"] = yr
+                yield _event("status", stage="citation",
+                             message=f"Year from Grok: {yr}")
+
         yield _event("metadata", **{k: v for k, v in metadata.items() if k != "abstract"})
 
         # ── 4. DeepSeek summarization ─────────────────────────────────────

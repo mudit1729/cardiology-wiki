@@ -3,7 +3,7 @@ title: "Single antiplatelet or anticoagulant followed by antiplatelet after TAVR
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2023
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "BMJ Open"
+
 ---
 # Single Antiplatelet or Anticoagulant Followed by Antiplatelet After TAVR (TAORTA Trial Protocol)
 

@@ -3,7 +3,7 @@ title: "Optical coherence tomography imaging during PCI impacts physician decisi
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2015
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "European Heart Journal"
+
 ---
 # Optical Coherence Tomography Imaging During PCI Impacts Physician Decision-Making: ILUMIEN I Study
 

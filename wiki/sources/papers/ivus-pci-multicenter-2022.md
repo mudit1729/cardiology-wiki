@@ -3,7 +3,7 @@ title: "Multi-center randomized trial of IVUS-guided PCI superiority"
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2022
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "PLoS ONE"
+
 ---
 # OPTIMAL Trial: IVUS-Guided PCI in Unprotected Left Main Coronary Artery Disease
 

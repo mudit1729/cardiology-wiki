@@ -3,7 +3,7 @@ title: "Bi-atrial versus left atrial ablation in rheumatic mitral valve disease 
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2022
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "BMJ Open"
+
 ---
 # Bi-atrial versus Left Atrial Ablation in Rheumatic Mitral Valve Disease and Non-paroxysmal AF (ABLATION Trial)
 

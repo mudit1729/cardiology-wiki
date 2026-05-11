@@ -3,7 +3,7 @@ title: "ULCO PCI: Ultra-low Contrast vs Conventional PCI in ACS"
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2022
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "Indian Heart Journal"
+
 ---
 # Ultra-low Contrast PCI vs Conventional PCI in ACS (CONSaVE-AKI)
 

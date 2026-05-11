@@ -3,7 +3,7 @@ title: "Colchicine for symptomatic coronary artery disease after PCI"
 type: paper
 status: active
 updated: 2026-05-10
-year: null
+year: 2022
 tags:
   - paper
 citations: 0
@@ -12,6 +12,8 @@ sources:
   drafted_by: deepseek
   reviewed_by: grok
 ingest_date: "2026-05-10"
+venue: "Open Heart"
+
 ---
 # Colchicine for Symptomatic Coronary Artery Disease After PCI
 
