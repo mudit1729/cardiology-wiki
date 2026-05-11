@@ -6,6 +6,13 @@ updated: 2026-05-10
 year: 2015
 tags:
   - paper
+  - stable-cad
+  - stemi
+  - nstemi
+  - pci
+  - imaging-guided-pci
+  - ivus
+  - oct
 citations: 0
 sources:
   ocr: ".grounding/md_fc/oct-pci-decision-making-2015.md"

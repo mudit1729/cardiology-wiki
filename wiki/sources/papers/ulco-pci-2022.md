@@ -6,6 +6,13 @@ updated: 2026-05-10
 year: 2022
 tags:
   - paper
+  - acs
+  - stemi
+  - pci
+  - imaging-guided-pci
+  - ivus
+  - heart-failure
+  - ci-aki
 citations: 0
 sources:
   ocr: ".grounding/md_fc/ulco-pci-2022.md"

@@ -6,6 +6,13 @@ updated: 2026-05-10
 year: 2022
 tags:
   - paper
+  - stable-cad
+  - stemi
+  - nstemi
+  - pci
+  - imaging-guided-pci
+  - ivus
+  - physiology-guided-pci
 citations: 0
 sources:
   ocr: ".grounding/md_fc/ivus-pci-multicenter-2022.md"

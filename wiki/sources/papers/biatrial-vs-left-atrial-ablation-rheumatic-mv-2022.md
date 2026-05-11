@@ -6,6 +6,13 @@ updated: 2026-05-10
 year: 2022
 tags:
   - paper
+  - acs
+  - af-pci
+  - atrial-fibrillation
+  - anticoagulation
+  - mitral
+  - rheumatic
+  - india-practice
 citations: 0
 sources:
   ocr: ".grounding/md_fc/biatrial-vs-left-atrial-ablation-rheumatic-mv-2022.md"

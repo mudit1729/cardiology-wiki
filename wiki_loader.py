@@ -296,6 +296,11 @@ class WikiRepository:
                 collections["Guidelines"].append(p)
             if p.page_type == "conference":
                 collections["Conferences"].append(p)
+        # Fallback: any paper not yet bucketed goes into a "Source-Grounded Papers" collection
+        bucketed = {p.path for v in collections.values() for p in v}
+        unbucketed = [p for p in all_papers if p.page_type == "paper" and p.path not in bucketed]
+        if unbucketed:
+            collections["Source-Grounded Papers"] = unbucketed
         return {k: v for k, v in collections.items() if v}
 
     def stats(self) -> dict[str, object]:
@@ -306,6 +311,7 @@ class WikiRepository:
         procedures = len([p for p in self._pages.values() if p.page_type == "procedure"])
         conferences = len([p for p in self._pages.values() if p.page_type == "conference"])
         concepts = len([p for p in self._pages.values() if p.page_type == "concept"])
+        papers = len([p for p in self._pages.values() if p.page_type == "paper"])
         tags = len(self.all_tags())
         return {
             "total": total,
@@ -314,6 +320,7 @@ class WikiRepository:
             "procedures": procedures,
             "conferences": conferences,
             "concepts": concepts,
+            "papers": papers,
             "tags": tags,
         }
 

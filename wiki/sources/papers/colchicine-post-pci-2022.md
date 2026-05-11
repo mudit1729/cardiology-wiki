@@ -6,6 +6,12 @@ updated: 2026-05-10
 year: 2022
 tags:
   - paper
+  - acs
+  - pci
+  - antiplatelet
+  - statin
+  - colchicine
+  - india-practice
 citations: 0
 sources:
   ocr: ".grounding/md_fc/colchicine-post-pci-2022.md"

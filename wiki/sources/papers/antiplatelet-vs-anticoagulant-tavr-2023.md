@@ -6,6 +6,13 @@ updated: 2026-05-10
 year: 2023
 tags:
   - paper
+  - acs
+  - antiplatelet
+  - af-pci
+  - anticoagulation
+  - tavr
+  - structural-heart
+  - aortic-stenosis
 citations: 0
 sources:
   ocr: ".grounding/md_fc/antiplatelet-vs-anticoagulant-tavr-2023.md"

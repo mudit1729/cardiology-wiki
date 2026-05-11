@@ -318,6 +318,60 @@ def extract_metadata_from_ocr(ocr_md: str) -> dict:
     return out
 
 
+# Keyword → tag mapping for auto-tagging cardiology papers based on title + body content.
+# Order matters only for the few keys where multiple keywords could match — most are independent.
+TAG_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("stable-cad",            ["stable angina", "stable coronary", "chronic coronary"]),
+    ("acs",                   ["acute coronary syndrome", "ACS"]),
+    ("stemi",                 ["STEMI", "ST-elevation myocardial", "ST elevation"]),
+    ("nstemi",                ["NSTEMI", "non-ST-elevation"]),
+    ("pci",                   ["percutaneous coronary intervention", "PCI"]),
+    ("imaging-guided-pci",    ["IVUS", "OCT", "intravascular ultrasound", "optical coherence"]),
+    ("ivus",                  ["IVUS", "intravascular ultrasound"]),
+    ("oct",                   ["OCT-guided", "OCT imaging", "optical coherence tomography"]),
+    ("physiology-guided-pci", ["FFR", "iFR", "fractional flow reserve", "instantaneous wave-free"]),
+    ("ffr",                   ["FFR", "fractional flow reserve"]),
+    ("ifr",                   ["iFR", "instantaneous wave-free"]),
+    ("antiplatelet",          ["antiplatelet", "DAPT", "aspirin", "ticagrelor", "clopidogrel", "prasugrel"]),
+    ("dapt",                  ["DAPT", "dual antiplatelet"]),
+    ("af-pci",                ["atrial fibrillation", "warfarin", "DOAC", "rivaroxaban", "apixaban", "dabigatran", "edoxaban"]),
+    ("atrial-fibrillation",   ["atrial fibrillation"]),
+    ("anticoagulation",       ["anticoagulation", "anticoagulant", "warfarin", "DOAC"]),
+    ("tavr",                  ["TAVR", "TAVI", "transcatheter aortic valve"]),
+    ("structural-heart",      ["TAVR", "TAVI", "MitraClip", "transcatheter aortic", "transcatheter mitral", "valve replacement"]),
+    ("aortic-stenosis",       ["aortic stenosis"]),
+    ("mitral",                ["mitral valve", "MitraClip"]),
+    ("rheumatic",             ["rheumatic"]),
+    ("lipid-prevention",      ["PCSK9", "evolocumab", "alirocumab", "bempedoic", "ezetimibe", "icosapent", "LDL"]),
+    ("pcsk9",                 ["PCSK9", "evolocumab", "alirocumab"]),
+    ("statin",                ["statin"]),
+    ("heart-failure",         ["heart failure", "HFrEF", "HFpEF", "ejection fraction"]),
+    ("sglt2",                 ["SGLT2", "dapagliflozin", "empagliflozin", "canagliflozin"]),
+    ("colchicine",            ["colchicine"]),
+    ("ci-aki",                ["contrast-induced acute kidney", "CI-AKI", "contrast nephropathy"]),
+    ("india-practice",        ["Indian", "India", "ABVIMS", "AIIMS", "south Asian"]),
+    ("rct",                   ["randomized", "randomised"]),
+    ("meta-analysis",         ["meta-analysis", "systematic review"]),
+    ("rheumatic-heart-disease", ["rheumatic heart", "rheumatic mitral"]),
+]
+
+
+def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]:
+    """Return a list of taxonomy tags based on keywords in the title + body excerpt."""
+    text = f"{title}\n\n{body_excerpt[:8000]}".lower()
+    matched: list[str] = ["paper"]
+    for tag, keywords in TAG_KEYWORDS:
+        if tag in matched:
+            continue
+        for kw in keywords:
+            if kw.lower() in text:
+                matched.append(tag)
+                break
+        if len(matched) >= max_tags:
+            break
+    return matched
+
+
 def xai_year_estimate(title: str) -> int | None:
     """Ask Grok for the publication year of a paper. Returns 4-digit int or None."""
     key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
@@ -415,7 +469,7 @@ def _slugify(title: str) -> str:
     return (s or "paper")[:80]
 
 
-def _build_frontmatter(metadata: dict, slug: str, source_info: dict) -> str:
+def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str = "") -> str:
     title = metadata.get("title") or slug
     authors = metadata.get("authors") or []
     year = metadata.get("year") or "null"
@@ -424,6 +478,7 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict) -> str:
     arxiv_id = source_info.get("id") if source_info.get("kind") == "arxiv" else None
     doi = (metadata.get("external_ids") or {}).get("DOI")
     today = time.strftime("%Y-%m-%d")
+    tags = auto_tag(title, body)
 
     lines = [
         "---",
@@ -444,7 +499,8 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict) -> str:
         for a in authors:
             lines.append(f"  - {a}")
     lines.append("tags:")
-    lines.append("  - paper")
+    for t in tags:
+        lines.append(f"  - {t}")
     lines.append(f"citations: {citations}")
     lines.append("sources:")
     lines.append(f'  ocr: ".grounding/md_fc/{slug}.md"')
@@ -618,7 +674,7 @@ def ingest_pipeline(
             ocr_path = GROUNDING_DIR / f"{slug}.md"
             ocr_path.write_text(ocr_md, encoding="utf-8")
 
-        full_page = _build_frontmatter(metadata, slug, source_info) + body.lstrip("\n")
+        full_page = _build_frontmatter(metadata, slug, source_info, body=body) + body.lstrip("\n")
         page_path.write_text(full_page, encoding="utf-8")
 
         yield _event("status", stage="write", message=f"Wrote {page_path.relative_to(BASE_DIR)}")
