@@ -222,13 +222,8 @@ class WikiRepository:
     def featured_pages(self) -> list[Page]:
         featured_paths = [
             "wiki/overview",
-            "wiki/concepts/interventional-cardiology",
-            "wiki/concepts/coronary-artery-disease",
-            "wiki/concepts/acute-coronary-syndromes",
-            "wiki/concepts/antiplatelet-therapy",
-            "wiki/concepts/structural-heart",
-            "wiki/concepts/heart-failure",
-            "wiki/concepts/india-practice",
+            "wiki/taxonomies/research-map",
+            "index",
         ]
         featured: list[Page] = []
         for path in featured_paths:
