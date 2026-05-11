@@ -4,6 +4,9 @@ type: paper
 status: active
 updated: 2026-05-10
 year: 2022
+source_url: "https://doi.org/10.1371/journal.pone.0260770"
+pmcid: "PMC8740965"
+doi: "10.1371/journal.pone.0260770"
 tags:
   - paper
   - stable-cad

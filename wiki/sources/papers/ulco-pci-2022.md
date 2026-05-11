@@ -4,6 +4,9 @@ type: paper
 status: active
 updated: 2026-05-10
 year: 2022
+source_url: "https://doi.org/10.1016/j.ihj.2022.08.004"
+pmcid: "PMC9647695"
+doi: "10.1016/j.ihj.2022.08.004"
 tags:
   - paper
   - acs

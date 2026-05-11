@@ -209,6 +209,28 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
 # Citation patterns in PDF headers (most reliable signal of publication year + venue).
 # Matches "Open Heart 2022;9:e001887", "European Heart Journal (2015) 36, 3346-3355",
 # "BMJ Open 2023;13:e076781", "Eur Heart J. 2015 Dec 14; 36(47):3346-3355", etc.
+DOI_IN_OCR_RE = re.compile(r"\b(?:doi|DOI)[:\s]+\s*(10\.\d{4,9}/[^\s\)\]\>]+)", re.IGNORECASE)
+DOI_BARE_RE = re.compile(r"\b(10\.\d{4,9}/[A-Za-z0-9._\-/]+[A-Za-z0-9])")
+PMCID_IN_OCR_RE = re.compile(r"\b(PMC\d{5,10})\b")
+
+
+def extract_doi_from_ocr(ocr_md: str) -> str | None:
+    head = ocr_md[:8000]
+    m = DOI_IN_OCR_RE.search(head)
+    if m:
+        return m.group(1).rstrip(".,;").strip()
+    m = DOI_BARE_RE.search(head)
+    if m:
+        return m.group(1).rstrip(".,;").strip()
+    return None
+
+
+def extract_pmcid_from_ocr(ocr_md: str) -> str | None:
+    head = ocr_md[:8000]
+    m = PMCID_IN_OCR_RE.search(head)
+    return m.group(1) if m else None
+
+
 JOURNAL_CITE_PATTERNS = [
     # "Journal YEAR;Vol:..."  e.g. "Open Heart 2022;9:e001887"
     re.compile(r"\b([A-Z][A-Za-z]+(?:\s[A-Z]?[A-Za-z]+){0,5})\s+(\d{4})\s*[;:]\s*\d"),
@@ -476,9 +498,22 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     venue = metadata.get("venue") or "null"
     citations = metadata.get("citations") or 0
     arxiv_id = source_info.get("id") if source_info.get("kind") == "arxiv" else None
-    doi = (metadata.get("external_ids") or {}).get("DOI")
+    doi = source_info.get("doi") or (metadata.get("external_ids") or {}).get("DOI")
+    pmcid = source_info.get("pmcid") or (source_info.get("id") if source_info.get("kind") == "pmc" else None)
+    abs_url = source_info.get("abs_url")
     today = time.strftime("%Y-%m-%d")
     tags = auto_tag(title, body)
+
+    # Compute the canonical "open original" URL: prefer DOI > PMC > abs_url > pdf_url
+    source_url = None
+    if doi:
+        source_url = f"https://doi.org/{doi}"
+    elif pmcid:
+        source_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
+    elif abs_url:
+        source_url = abs_url
+    elif arxiv_id:
+        source_url = f"https://arxiv.org/abs/{arxiv_id}"
 
     lines = [
         "---",
@@ -494,6 +529,10 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
         lines.append(f'arxiv_id: "{arxiv_id}"')
     if doi:
         lines.append(f'doi: "{doi}"')
+    if pmcid:
+        lines.append(f'pmcid: "{pmcid}"')
+    if source_url:
+        lines.append(f'source_url: "{source_url}"')
     if authors:
         lines.append("authors:")
         for a in authors:
@@ -572,12 +611,19 @@ def ingest_pipeline(
     pdf_bytes: bytes | None = None,
     title_hint: str | None = None,
     slug_hint: str | None = None,
+    source_url: str | None = None,
 ) -> Generator[Tuple[str, dict], None, None]:
     try:
         # ── 1. Detect / acquire ────────────────────────────────────────────
         if pdf_bytes:
             yield _event("status", stage="source", message=f"Using uploaded PDF ({len(pdf_bytes)} bytes)")
-            source_info = {"kind": "upload", "id": None, "pdf_url": None, "abs_url": None}
+            source_info = {"kind": "upload", "id": None, "pdf_url": None,
+                           "abs_url": source_url or None}
+            if source_url:
+                pmc_m = PMCID_IN_OCR_RE.search(source_url)
+                if pmc_m:
+                    source_info["kind"] = "pmc"
+                    source_info["id"] = pmc_m.group(1)
         else:
             if not url:
                 raise ValueError("Provide either a URL or upload a PDF")
@@ -599,6 +645,18 @@ def ingest_pipeline(
                     raise RuntimeError(f"PDF download too small ({len(pdf)} bytes) — likely blocked")
                 ocr_md = mistral_ocr_bytes(pdf)
         yield _event("status", stage="ocr", message=f"OCR complete — {len(ocr_md):,} chars")
+
+        # Extract DOI / PMC ID from OCR for citation links
+        ocr_doi = extract_doi_from_ocr(ocr_md)
+        ocr_pmcid = extract_pmcid_from_ocr(ocr_md)
+        if ocr_doi:
+            source_info["doi"] = ocr_doi
+            yield _event("status", stage="ocr", message=f"DOI from OCR: {ocr_doi}")
+        if ocr_pmcid and not source_info.get("id"):
+            source_info["pmcid"] = ocr_pmcid
+            yield _event("status", stage="ocr", message=f"PMC ID from OCR: {ocr_pmcid}")
+        elif ocr_pmcid:
+            source_info["pmcid"] = ocr_pmcid
 
         ocr_title = title_hint
         if not ocr_title:

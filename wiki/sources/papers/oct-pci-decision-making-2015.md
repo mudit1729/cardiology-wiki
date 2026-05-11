@@ -4,6 +4,9 @@ type: paper
 status: active
 updated: 2026-05-10
 year: 2015
+source_url: "https://doi.org/10.1093/eurheartj/ehv367"
+pmcid: "PMC4677272"
+doi: "10.1093/eurheartj/ehv367"
 tags:
   - paper
   - stable-cad

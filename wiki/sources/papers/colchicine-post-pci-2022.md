@@ -4,6 +4,9 @@ type: paper
 status: active
 updated: 2026-05-10
 year: 2022
+source_url: "https://doi.org/10.1136/openhrt-2021-001887"
+pmcid: "PMC8739658"
+doi: "10.1136/openhrt-2021-001887"
 tags:
   - paper
   - acs

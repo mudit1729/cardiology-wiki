@@ -54,6 +54,35 @@
     </article>
 
     <aside class="sidebar-panel">
+      {% if page.meta.source_url or page.meta.doi or page.meta.pmcid %}
+        <div class="sidebar-block">
+          <h3>Source</h3>
+          {% if page.meta.source_url %}
+            <a class="focus-link" href="{{ page.meta.source_url }}" target="_blank" rel="noopener">
+              Open original &rarr;
+            </a>
+          {% endif %}
+          {% if page.meta.doi %}
+            <div class="sidebar-meta">
+              <span class="meta-label">DOI</span>
+              <a href="https://doi.org/{{ page.meta.doi }}" target="_blank" rel="noopener">{{ page.meta.doi }}</a>
+            </div>
+          {% endif %}
+          {% if page.meta.pmcid %}
+            <div class="sidebar-meta">
+              <span class="meta-label">PMC</span>
+              <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/{{ page.meta.pmcid }}/" target="_blank" rel="noopener">{{ page.meta.pmcid }}</a>
+            </div>
+          {% endif %}
+          {% if page.meta.arxiv_id %}
+            <div class="sidebar-meta">
+              <span class="meta-label">arXiv</span>
+              <a href="https://arxiv.org/abs/{{ page.meta.arxiv_id }}" target="_blank" rel="noopener">{{ page.meta.arxiv_id }}</a>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
       <div class="sidebar-block">
         <h3>Page Info</h3>
         <div class="sidebar-meta">
