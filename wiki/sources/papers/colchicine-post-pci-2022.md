@@ -9,20 +9,20 @@ pmcid: "PMC8739658"
 doi: "10.1136/openhrt-2021-001887"
 tags:
   - paper
-  - acs
+  - meta-analysis
   - pci
-  - antiplatelet
-  - statin
   - colchicine
-  - india-practice
-citations: 0
+  - secondary-prevention
+  - inflammation
+citations: null
 sources:
   ocr: ".grounding/md_fc/colchicine-post-pci-2022.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "Open Heart"
-
+study_status: meta-analysis
+clinical_review: false
 ---
 # Colchicine for Symptomatic Coronary Artery Disease After PCI
 
@@ -66,15 +66,13 @@ In patients with symptomatic coronary artery disease who have undergone percutan
 "After a heart attack or stent procedure, inflammation in your blood vessels can raise the risk of future issues like blockages, strokes, or stent clots. Colchicine, an old and inexpensive drug used for gout, helps reduce this inflammation. In a study of over 6,600 patients with stents, adding low-dose colchicine to standard medications like aspirin and statins lowered the chance of serious heart problems by 27%. For every 41 people treated, one major event was prevented. It mainly reduced the need for repeat procedures, strokes, and stent clots. However, it didn’t lower the risk of death, and we’re still figuring out the best dose and timing. It’s generally safe but can cause stomach upset or diarrhea in some."
 
 ## Relevance for Indian Practice
-- **Cost-Effectiveness**: Colchicine is inexpensive and widely available in India, ideal for secondary prevention in resource-limited settings.
-- **Accessibility**: Available over-the-counter at low cost with no monitoring requirements.
-- **Dosing Simplicity**: Low-dose regimens (0.5 mg once or twice daily) are easy to implement.
-- **Follow-Up**: No need for frequent lab monitoring, beneficial in areas with limited infrastructure.
-- **High-Risk Population**: India’s high burden of premature CAD and diabetes aligns with the study population (20-100% diabetic across trials), showing benefit.
-- **Clinical Impact**: NNT of 41 is meaningful given high post-PCI event rates in India.
-- **Caution**: Gastrointestinal side effects may affect compliance; patient counseling is key.
-- **Drug Interactions**: Low-dose colchicine has minimal risk, but interactions with statins (e.g., atorvastatin) and fibrates should be considered.
-- **Contraindications**: Dose adjustment needed in renal impairment, common in Indian diabetic patients; avoid in severe CKD.
+- **Cost**: Colchicine is generally low-cost in India compared to PCSK9 inhibitors or other secondary-prevention agents. A formal cost-effectiveness study in the Indian context has not been done as of this writing.
+- **Use should follow current guideline indications.** Local prescribing rules vary; verify availability and pharmacy-class designation for your specific setting before relying on over-the-counter access.
+- **Dosing uncertainty**: Optimal dosing regimen for this indication remains unclear (0.5 mg once daily vs 0.6 mg twice daily; periprocedural vs long-term).
+- **Renal/hepatic safety**: Dose adjustment is needed in renal impairment, which is common in Indian diabetic patients; avoid in severe CKD.
+- **Drug interactions**: Review for interactions (CYP3A4 inhibitors, P-gp inhibitors, statins) before initiation.
+- **High-risk population**: The pooled study population (20–100% diabetic across the seven trials) overlaps with the Indian post-PCI population.
+- **Bottom line**: Potentially low-cost adjunct in selected post-PCI patients, but use should follow current guideline indications, renal/hepatic safety checks, interaction review, and local prescribing rules. Not a replacement for guideline-directed antiplatelet, statin, or other secondary-prevention therapy.
 
 ## Related Trials
 - COPS Trial: Included in this analysis, focusing on colchicine in PCI patients.

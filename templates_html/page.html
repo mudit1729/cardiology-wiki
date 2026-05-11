@@ -26,6 +26,9 @@
           {% if page.page_type %}
             <span class="type-badge">{{ page.page_type }}</span>
           {% endif %}
+          {% if page.meta.study_status %}
+            <span class="type-badge">{{ page.meta.study_status }}</span>
+          {% endif %}
           {% if page.year %}
             <span class="meta-pill">{{ page.year }}</span>
           {% endif %}
@@ -45,6 +48,14 @@
               {% endfor %}
             </div>
           {% endif %}
+        </div>
+      {% endif %}
+
+      {% if page.meta.clinical_review == false or page.meta.clinical_review == 'false' %}
+        <div class="article-meta-bar" style="background:var(--amber-soft); border-left:3px solid var(--amber); padding:0.6rem 0.9rem; margin-bottom:1rem; font-size:0.85rem; color:var(--text-secondary);">
+          <strong style="color:var(--amber);">⚠ Not clinically reviewed.</strong>
+          This summary was drafted by an LLM (DeepSeek) and reviewed by an LLM (Grok), not by a clinician.
+          Verify all claims against the original source before clinical use.
         </div>
       {% endif %}
 

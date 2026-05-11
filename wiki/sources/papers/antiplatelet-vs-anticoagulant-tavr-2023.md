@@ -9,21 +9,22 @@ pmcid: "PMC10668142"
 doi: "10.1136/bmjopen-2023-076781"
 tags:
   - paper
-  - acs
-  - antiplatelet
-  - af-pci
-  - anticoagulation
+  - protocol
   - tavr
   - structural-heart
+  - antithrombotic
+  - warfarin
+  - aspirin
   - aortic-stenosis
-citations: 0
+citations: null
 sources:
   ocr: ".grounding/md_fc/antiplatelet-vs-anticoagulant-tavr-2023.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "BMJ Open"
-
+study_status: protocol
+clinical_review: false
 ---
 # Single Antiplatelet or Anticoagulant Followed by Antiplatelet After TAVR (TAORTA Trial Protocol)
 
@@ -47,7 +48,7 @@ This is a protocol paper (BMJ Open 2023) with no results available yet. The TAOR
 
 ## What Changed?
 - No practice change yet, as this is a protocol for an ongoing trial.
-- The TAORTA trial is the first randomized controlled trial of antithrombotic strategies specifically in Chinese TAVR patients, evaluating both clinical events and 4D-CT-based bioprosthetic valve thrombosis (BPVT) endpoints.
+- The TAORTA trial is described by its authors as a randomized controlled trial of antithrombotic strategies in a Chinese TAVR population (verify the "first such trial" claim against trial registries before relying on it), evaluating both clinical events and 4D-CT-based bioprosthetic valve thrombosis (BPVT) endpoints. **No clinical practice change should be inferred until results are published.**
 - It addresses the evidence gap for early (6-month) use of oral anticoagulation (OAC) versus single-antiplatelet therapy (SAPT) in patients without anticoagulation indications.
 - The trial uses warfarin (not DOACs) with a lower INR target (1.8–2.5) to balance efficacy and bleeding risk in an Asian population.
 

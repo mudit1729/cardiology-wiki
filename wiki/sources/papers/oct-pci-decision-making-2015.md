@@ -9,21 +9,22 @@ pmcid: "PMC4677272"
 doi: "10.1093/eurheartj/ehv367"
 tags:
   - paper
-  - stable-cad
-  - stemi
-  - nstemi
+  - observational
   - pci
-  - imaging-guided-pci
-  - ivus
   - oct
-citations: 0
+  - ffr
+  - imaging-guided-pci
+  - stable-cad
+  - nstemi
+citations: null
 sources:
   ocr: ".grounding/md_fc/oct-pci-decision-making-2015.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "European Heart Journal"
-
+study_status: observational
+clinical_review: false
 ---
 # Optical Coherence Tomography Imaging During PCI Impacts Physician Decision-Making: ILUMIEN I Study
 
@@ -59,7 +60,7 @@ Does intra-procedural optical coherence tomography (OCT) imaging before and afte
 - As an observational, non-randomized study, clinical superiority of OCT-guided over angiography-guided PCI was not proven.
 - No mortality benefit (death 0.25%) or reduction in stent thrombosis (0.25%) was demonstrated.
 - Contrast use did not differ between optimization subgroups (P = 0.60).
-- Long-term outcomes beyond 30 days were not reported (1-year data pending).
+- Long-term outcomes beyond 30 days were not reported in the original publication (1-year data was pending **at the time of the 2015 paper**; subsequent ILUMIEN II/III/IV evidence has since been published and supersedes this footnote).
 - No prescriptive OCT criteria were mandated, leading to wide variation in physician behavior (7–80% pre-PCI changes, 8–55% post-PCI changes per site).
 - High-risk populations (STEMI, left main PCI, severe CKD, restenosis, stent thrombosis) were excluded.
 

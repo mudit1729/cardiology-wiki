@@ -9,21 +9,21 @@ pmcid: "PMC9647695"
 doi: "10.1016/j.ihj.2022.08.004"
 tags:
   - paper
+  - rct
   - acs
-  - stemi
   - pci
-  - imaging-guided-pci
-  - ivus
-  - heart-failure
-  - ci-aki
-citations: 0
+  - contrast-induced-aki
+  - ckd
+  - ultra-low-contrast
+citations: null
 sources:
   ocr: ".grounding/md_fc/ulco-pci-2022.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "Indian Heart Journal"
-
+study_status: rct
+clinical_review: false
 ---
 # Ultra-low Contrast PCI vs Conventional PCI in ACS (CONSaVE-AKI)
 
@@ -49,10 +49,11 @@ In patients with acute coronary syndrome (ACS) and increased risk of contrast-in
 - **IVUS use:** 17% in ULC-PCI vs 2.4% in conventional PCI (p < 0.0001).
 
 ## What Changed?
-- ULC-PCI proved feasible and safe in high-risk ACS patients with renal dysfunction, achieving a 0% incidence of CI-AKI compared to 17.1% with conventional PCI.
-- A contrast conservation strategy (CV/eGFR ≤1:1) using techniques like diluted contrast, landmark-based stent positioning, saline hook confirmation, and marking wire technique effectively prevented CI-AKI, even without routine IVUS guidance.
-- This approach addresses "renalism"—the hesitancy to perform PCI in ACS patients with renal dysfunction—by offering a safe revascularization option.
-- Overall eGFR improved post-PCI in both groups, suggesting that revascularization benefits may outweigh contrast-related renal injury when contrast use is minimized.
+- In this small (n=82) single-center single-operator open-label RCT, ULC-PCI **appeared feasible** in high-risk ACS patients with renal dysfunction and was **associated with lower CI-AKI** in the trial population (0% vs 17.1%).
+- A contrast conservation strategy (CV/eGFR ≤1:1) using techniques like diluted contrast, landmark-based stent positioning, saline hook confirmation, and marking wire was **associated with reduced CI-AKI in this study** even without routine IVUS guidance.
+- The study contributes evidence relevant to "renalism" — the hesitancy to perform PCI in ACS patients with renal dysfunction — but does **not** itself demonstrate broad safety, since secondary safety outcomes were underpowered.
+- Eligibility excluded primary-PCI STEMI and CTO; results should not be extrapolated to those populations.
+- **Requires multi-center validation before broad practice adoption.**
 
 ## What Did Not Change?
 - No significant differences were observed in 30-day secondary safety outcomes, including death, dialysis, re-hospitalization, repeat myocardial infarction, or stent thrombosis.
@@ -61,10 +62,10 @@ In patients with acute coronary syndrome (ACS) and increased risk of contrast-in
 - IVUS was not mandatory (used in only 17% of ULC-PCI cases), and zero-contrast or near-zero contrast PCI with routine IVUS was not the primary strategy tested.
 
 ## How I Would Explain This to a Patient
-"If you have a heart attack and kidney problems, the dye used during angioplasty can sometimes harm your kidneys. In this study, doctors used a new method with much less dye—less than a teaspoon per unit of kidney function—compared to the usual amount. They used special tricks like relying on previous X-rays, using saltwater to check equipment position, and placing extra wires as guides. None of the 41 patients who got the low-dye method had kidney injury, while 7 out of 41 with the usual method did. This means we can safely open your blocked heart arteries without as much worry about harming your kidneys."
+"If you have certain heart attacks and existing kidney problems, the contrast dye used during angioplasty can sometimes worsen your kidney function. In this small Indian single-center study of 82 patients undergoing non-primary PCI, doctors used a low-contrast technique (less than a teaspoon per unit of kidney function) compared to the usual amount. None of the 41 patients on the low-contrast method developed kidney injury, while 7 of 41 on the usual method did. This is encouraging but is one small study; larger multi-center trials are needed before this technique becomes standard practice, and it has not been tested in patients with the most acute kind of heart attack (STEMI requiring primary PCI)."
 
 ## Relevance for Indian Practice
-- ULC-PCI is highly applicable in resource-limited settings where IVUS is not widely available, as only 17% of cases required IVUS guidance.
+- ULC-PCI may be relevant in resource-constrained settings where IVUS is less widely available, since only 17% of ULC-PCI cases used IVUS in this trial — but feasibility outside high-volume operators requires further study.
 - It is cost-effective, relying on operator skill and existing materials without needing expensive equipment.
 - The high burden of chronic kidney disease (CKD) in Indian ACS patients, often leading to under-revascularization due to "renalism," makes this strategy particularly relevant.
 - The pre-hydration protocol (1 mL/kg/h saline for 12 hours pre- and 24 hours post-PCI) is feasible and inexpensive.

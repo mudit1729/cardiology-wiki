@@ -9,23 +9,27 @@ pmcid: "PMC8740965"
 doi: "10.1371/journal.pone.0260770"
 tags:
   - paper
-  - stable-cad
-  - stemi
-  - nstemi
+  - protocol
   - pci
-  - imaging-guided-pci
+  - left-main
   - ivus
-  - physiology-guided-pci
-citations: 0
+  - imaging-guided-pci
+citations: 18
 sources:
   ocr: ".grounding/md_fc/ivus-pci-multicenter-2022.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "PLoS ONE"
-
+study_status: protocol
+clinical_review: false
 ---
 # OPTIMAL Trial: IVUS-Guided PCI in Unprotected Left Main Coronary Artery Disease
+
+> **2026 Results Now Available — see "OPTIMAL 2026 Results" section below.**
+> The body of this page summarizes the original 2022 study **protocol**.
+> Final results from the completed trial were published in NEJM on March 30, 2026
+> and presented at ACC.26.
 
 ## Clinical Question
 In patients undergoing percutaneous coronary intervention (PCI) for unprotected left main coronary artery (LMCA) disease, does an intravascular ultrasound (IVUS)-guided strategy reduce clinical events compared to standard angiography-guided PCI?
@@ -76,3 +80,38 @@ The left main artery is a critical blood vessel supplying your heart. When placi
 - **MAIN-COMPARE Registry:** Observational data suggesting better outcomes with IVUS-guided PCI in LMCA disease.
 - **IVUS-TRONCO-ICP Study:** Observational study supporting IVUS use in complex coronary interventions.
 - **EXCEL and NOBLE Trials:** Subgroup analyses indicating potential benefits of IVUS in LMCA PCI, though not as the primary focus.
+
+## OPTIMAL 2026 Results
+
+The completed OPTIMAL trial was published in NEJM on **March 30, 2026** and presented at ACC.26
+([PubMed](https://pubmed.ncbi.nlm.nih.gov/41911017/),
+[ACC summary](https://www.acc.org/latest-in-cardiology/articles/2026/03/25/21/27/mon-1045am-combo-acc-2026)).
+
+### Headline Result
+
+- **806 patients** randomized with unprotected left main coronary artery disease.
+- At median **2.9 years** of follow-up, the primary composite endpoint occurred in:
+  - **33.7%** of the IVUS-guided PCI group
+  - **30.9%** of the angiography-guided PCI group
+  - HR **1.11**, 95% CI 0.87–1.42, **p = 0.40**
+- **Conclusion:** IVUS-guided PCI **did not** show a benefit over angiography-guided PCI for the
+  composite of stroke, MI, repeat revascularization, or all-cause death in unprotected LMCA disease.
+
+### What This Means
+
+- The protocol's pre-specified expectation of a 35% relative risk reduction with IVUS was **not** observed.
+- For unprotected LMCA PCI specifically, this result tempers the previously expected magnitude of benefit
+  from routine IVUS guidance.
+- Class IIa, level B European guideline recommendations for IVUS in LMCA evaluation may be
+  re-evaluated as this evidence is incorporated.
+- Note: this does **not** invalidate IVUS use in other complex PCI scenarios — separate trials such as
+  RENOVATE-COMPLEX-PCI, ULTIMATE, ILUMIEN IV (OCT), and OCTOBER (OCT, bifurcations) report
+  different findings in different anatomic contexts.
+
+### Caveats
+
+- Results are summarized from the published abstract / press summary; verify the full NEJM paper
+  before clinical incorporation.
+- Subgroup analyses, secondary endpoints, and stent thrombosis outcomes are not reproduced here yet —
+  re-ingest the 2026 NEJM paper through the pipeline once an OA version is available to populate
+  a separate OPTIMAL-results page.

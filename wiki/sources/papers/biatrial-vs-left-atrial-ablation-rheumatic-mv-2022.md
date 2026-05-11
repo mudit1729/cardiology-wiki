@@ -9,21 +9,20 @@ pmcid: "PMC9710358"
 doi: "10.1136/bmjopen-2022-064861"
 tags:
   - paper
-  - acs
-  - af-pci
+  - protocol
   - atrial-fibrillation
-  - anticoagulation
+  - surgical-ablation
+  - rheumatic-heart-disease
   - mitral
-  - rheumatic
-  - india-practice
-citations: 0
+citations: null
 sources:
   ocr: ".grounding/md_fc/biatrial-vs-left-atrial-ablation-rheumatic-mv-2022.md"
-  drafted_by: deepseek
-  reviewed_by: grok
+  llm_drafted_by: deepseek
+  llm_reviewed_by: grok
 ingest_date: "2026-05-10"
 venue: "BMJ Open"
-
+study_status: protocol
+clinical_review: false
 ---
 # Bi-atrial versus Left Atrial Ablation in Rheumatic Mitral Valve Disease and Non-paroxysmal AF (ABLATION Trial)
 
@@ -43,7 +42,7 @@ In patients with rheumatic mitral valve disease and non-paroxysmal atrial fibril
 This is a study protocol; no results are available yet. The trial began recruitment in May 2022, with expected completion of recruitment by April 2024 and follow-up by April 2025. The planned sample size is 320 patients (1:1 randomization, 144 per group + 10% withdrawal). Power calculations assume a primary endpoint of 70% freedom from atrial tachyarrhythmias in the left atrial group versus 85% in the bi-atrial group (90% power, one-sided α=0.05), and a key secondary endpoint of non-inferiority for permanent pacemaker implantation with a -5% margin (80% power, one-sided α=0.05). Hierarchical testing ensures the secondary endpoint is tested only if the primary endpoint is significant, preserving overall type I error at 5%.
 
 ## What Changed?
-This trial is the first multicentre RCT with a large sample size specifically evaluating bi-atrial versus left atrial ablation in rheumatic mitral valve disease, distinct from degenerative mitral valve disease. Prior evidence was limited, with the only previous RCT (Wang et al., 2014) showing no superiority of bi-atrial ablation (p=0.09) and inconclusive pacemaker data due to small sample size. The trial mandates unified ablation tools (bipolar radiofrequency clamp + pen) and standardized lesion sets across 19 centres, with video review of surgeon technique before initiation. Patients with significant right heart pathology (RV dysfunction, moderate-severe TR, PASP >60 mmHg) are excluded, recognizing that left atrial ablation alone would be unethical in those with severe right atrial remodelling.
+This trial is presented by its authors as a multicentre RCT designed to evaluate bi-atrial versus left atrial ablation in rheumatic mitral valve disease (distinct from degenerative mitral valve disease); verify the "first such trial" claim against trial registries before relying on it. Prior evidence was limited, with the only previous RCT (Wang et al., 2014) showing no superiority of bi-atrial ablation (p=0.09) and inconclusive pacemaker data due to small sample size. The trial mandates unified ablation tools (bipolar radiofrequency clamp + pen) and standardized lesion sets across 19 centres, with video review of surgeon technique before initiation. Patients with significant right heart pathology (RV dysfunction, moderate-severe TR, PASP >60 mmHg) are excluded; the protocol's stated rationale is that left atrial ablation alone may be inadequate in patients with severe right atrial remodelling. **No clinical practice change should be inferred until results are published.**
 
 ## What Did Not Change?
 The optimal lesion set for surgical AF ablation in rheumatic mitral valve disease remains unproven until trial results are available. Whether bi-atrial ablation increases the risk of permanent pacemaker implantation is unresolved and is the key secondary endpoint. The blanking period (first 3 months post-op) remains standard, with recurrences during this period not counted. Anticoagulation protocol is unchanged, using warfarin for 3 months post-op routinely and lifetime for mechanical valves. Antiarrhythmic drugs are prescribed only for 2 months if perioperative AF/flutter occurs.

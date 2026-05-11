@@ -5,57 +5,56 @@ status: active
 tags:
   - overview
   - navigation
-updated: 2026-05-10
+updated: 2026-05-11
 ---
 
 # Cardiology Wiki Overview
 
-An interventional cardiology intelligence system covering practice-changing trials, current guidelines, procedural techniques, and conference updates.
+This wiki is an early ingestion workspace for source-grounded summaries of cardiology
+literature. It is **not** yet a complete cardiology guideline / trial / procedure
+encyclopedia, and it should not be used as a clinical reference.
 
-## What This Wiki Covers
+## Current State (2026-05-11)
 
-### Trials
-Practice-changing randomized controlled trials in interventional cardiology organized by domain: stable CAD, ACS/STEMI, imaging-guided PCI, physiology-guided PCI, antiplatelet therapy, AF+PCI, TAVR/structural heart, lipid/prevention, and heart failure.
+The live wiki contains:
 
-Each trial page includes a structured summary with clinical question, PICO table, key results, what changed in practice, what did not change, a one-minute patient explanation, India practice relevance, and connections to related trials and guidelines.
+- **6 ingested paper summaries** under `wiki/sources/papers/` — produced by the
+  Mistral OCR &rarr; DeepSeek summary &rarr; XAI Grok integration pipeline from
+  open-access PDFs in PubMed Central.
+- **Taxonomy / planning pages** under `wiki/taxonomies/research-map.md` and `wiki/overview.md`.
+- The `wiki/trials/`, `wiki/guidelines/`, `wiki/procedures/`, `wiki/conferences/`,
+  and `wiki/concepts/` directories are **empty**. They are placeholders for
+  future ingestion or hand-authored content.
 
-### Guidelines
-Major society guidelines from ACC/AHA, ESC, and SCAI with class of recommendation tables, key updates from prior versions, and practical implementation notes.
+LLM-generated summaries on each paper page have **not** been clinically reviewed.
+Each page carries `clinical_review: false` in its frontmatter.
 
-### Procedures
-Procedural playbooks for common interventional cardiology procedures including radial access PCI, femoral access and closure, IVUS-guided stenting, FFR/iFR measurement, rotational atherectomy, chronic total occlusion PCI, TAVR, and mechanical circulatory support.
+## How Pages Are Created
 
-### Conferences
-Intelligence from major cardiology conferences including ACC, AHA, TCT, EuroPCR, and ESC with late-breaking trial summaries and practice-changing takeaways.
+New paper summaries are added through `/add-paper`. The pipeline:
 
-### Concepts
-Foundational concept pages that tie together trials, guidelines, and procedures within each domain.
-
-## How It's Organized
-
-Pages are organized in a directory structure:
-
-- `wiki/trials/` — trial summaries grouped by domain
-- `wiki/guidelines/` — guideline summaries
-- `wiki/procedures/` — procedural playbooks
-- `wiki/conferences/` — conference intelligence
-- `wiki/concepts/` — concept overview pages
-- `wiki/syntheses/` — cross-domain synthesis pages
-- `wiki/sources/papers/` — ingested paper summaries
-
-## Pipeline
-
-New papers can be ingested through the **Add** page. The pipeline:
 1. **Mistral OCR** extracts text from the PDF
-2. **Semantic Scholar** fetches metadata and citation counts (XAI Grok fallback)
-3. **DeepSeek** generates a structured cardiology-focused summary
-4. **XAI Grok** performs final integration and writes the wiki page
+2. **Semantic Scholar** fetches metadata and citation counts (XAI Grok fallback for citation estimate)
+3. **Year, venue, DOI, PMC ID** are extracted from the OCR header if Semantic Scholar misses
+4. **DeepSeek** drafts a structured summary (Clinical Question, PICO, Key Results, etc.)
+5. **XAI Grok** integrates the summary into a final wiki page
+6. Auto-generated **tags** are derived from a controlled keyword vocabulary (conservative: title or repeated body match required, exclusion-criteria contexts filtered)
+
+Each page records `source_url`, `doi`, `pmcid`, and `arxiv_id` (when available)
+so the original paper is one click away.
 
 ## Views
 
-- **Trials** — filterable grid of all trial/evidence pages
-- **Graph** — interactive force-directed network showing connections between trials
-- **Timeline** — horizontal timeline of trials grouped by research direction
+- **Trials** — filterable grid of all paper / trial / guideline / procedure / conference pages
+- **Graph** — interactive force-directed network showing connections between papers
+- **Timeline** — horizontal timeline of papers grouped by research direction
 - **Tags** — tag cloud with filtered results
-- **Chat** — RAG-powered Q&A using selected trial summaries as context
+- **Chat** — RAG-powered Q&A using selected paper summaries as context (DeepSeek streaming)
 - **Search** — full-text search across the entire wiki
+
+## Roadmap
+
+- Expand the source-grounded paper corpus by ingesting more open-access cardiology RCTs
+- Build out the empty `wiki/trials/`, `wiki/guidelines/`, `wiki/procedures/`,
+  `wiki/conferences/`, `wiki/concepts/` directories with reviewed content
+- Add clinician-reviewed pages with `clinical_review: true` once such review exists

@@ -379,14 +379,32 @@ TAG_KEYWORDS: list[tuple[str, list[str]]] = [
 
 
 def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]:
-    """Return a list of taxonomy tags based on keywords in the title + body excerpt."""
-    text = f"{title}\n\n{body_excerpt[:8000]}".lower()
+    """Return a list of taxonomy tags. Conservative: tag fires only when
+    a keyword appears in the title OR ≥2 times in the body, AND is not
+    in an exclusion-criteria context (e.g. "STEMI was excluded").
+    """
+    title_low = title.lower()
+    body_low = body_excerpt[:12000].lower()
     matched: list[str] = ["paper"]
+
+    def is_excluded(kw_low: str) -> bool:
+        # If every body occurrence is in an exclusion-criteria context, skip the tag.
+        positives = 0
+        for m in re.finditer(rf"\b{re.escape(kw_low)}\b", body_low):
+            window = body_low[max(0, m.start() - 80):m.start()]
+            if re.search(r"exclud|not eligible|exception of", window):
+                continue
+            positives += 1
+        return positives == 0
+
     for tag, keywords in TAG_KEYWORDS:
         if tag in matched:
             continue
         for kw in keywords:
-            if kw.lower() in text:
+            kw_low = kw.lower()
+            in_title = re.search(rf"\b{re.escape(kw_low)}\b", title_low) is not None
+            body_n = len(re.findall(rf"\b{re.escape(kw_low)}\b", body_low))
+            if (in_title or body_n >= 2) and not is_excluded(kw_low):
                 matched.append(tag)
                 break
         if len(matched) >= max_tags:
@@ -540,11 +558,13 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     lines.append("tags:")
     for t in tags:
         lines.append(f"  - {t}")
-    lines.append(f"citations: {citations}")
+    citations_val = "null" if citations in (0, None) else str(citations)
+    lines.append(f"citations: {citations_val}")
+    lines.append("clinical_review: false")
     lines.append("sources:")
     lines.append(f'  ocr: ".grounding/md_fc/{slug}.md"')
-    lines.append("  drafted_by: deepseek")
-    lines.append("  reviewed_by: grok")
+    lines.append("  llm_drafted_by: deepseek")
+    lines.append("  llm_reviewed_by: grok")
     lines.append(f'ingest_date: "{today}"')
     lines.append("---")
     lines.append("")
