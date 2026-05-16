@@ -5,7 +5,7 @@ Stream events as we move through:
   2. Mistral OCR  → ground-truth markdown
   3. Semantic Scholar lookup (with XAI fallback) → metadata + citations
   4. OpenAI GPT-5.5 streaming summarization → structured wiki draft
-  5. XAI Grok final integration → polished wiki page
+  5. GPT-5.5 final integration → polished wiki page
   6. Write wiki/sources/papers/{slug}.md + .grounding/md_fc/{slug}.md
 """
 
@@ -674,7 +674,7 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
 
 
 # ---------------------------------------------------------------------------
-# 5. XAI Grok final integration (with structured-summary fallback)
+# 5. GPT-5.5 final integration (with structured-summary fallback)
 # ---------------------------------------------------------------------------
 
 
@@ -766,7 +766,7 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     lines.append("sources:")
     lines.append(f'  ocr: ".grounding/md_fc/{slug}.md"')
     lines.append("  llm_drafted_by: gpt-5.5")
-    lines.append("  llm_reviewed_by: grok")
+    lines.append("  llm_reviewed_by: gpt-5.5")
     lines.append(f'ingest_date: "{today}"')
     lines.append("---")
     lines.append("")
@@ -818,8 +818,8 @@ def infer_paper_type(title: str, body: str) -> str:
     return "trial"
 
 
-def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, slug: str) -> str:
-    """Final integration step. Tries XAI Grok, then structured-summary passthrough."""
+def gpt55_integrate(structured_summary: str, metadata: dict, source_info: dict, slug: str) -> str:
+    """Final integration step. Uses GPT-5.5 to polish the structured summary into a wiki page."""
     title = metadata.get("title") or slug
     abs_url = source_info.get("abs_url") or source_info.get("pdf_url")
 
@@ -842,31 +842,40 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
         f"--- Structured summary ---\n{structured_summary}"
     )
 
-    xai_key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
-    timeout = int(os.environ.get("XAI_INTEGRATION_TIMEOUT", "90"))
-    if xai_key:
-        try:
-            resp = requests.post(
-                "https://api.x.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {xai_key}", "Content-Type": "application/json"},
-                json={
-                    "model": os.environ.get("XAI_INGEST_MODEL", "grok-4.2"),
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "max_tokens": 6000,
-                    "temperature": 0.2,
-                },
-                timeout=(10, timeout),
-            )
-            if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"]
-            print(f"[xai_integrate] Grok returned status {resp.status_code}: {resp.text[:200]}")
-        except requests.exceptions.Timeout:
-            print(f"[xai_integrate] Grok timed out after {timeout}s")
-        except Exception as exc:
-            print(f"[xai_integrate] Grok failed: {type(exc).__name__}: {exc}")
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        return structured_summary
+
+    model = os.environ.get("OPENAI_INTEGRATE_MODEL", "gpt-5.5")
+    fallback = os.environ.get("OPENAI_INTEGRATE_FALLBACK", "gpt-4o")
+    timeout = int(os.environ.get("OPENAI_INTEGRATE_TIMEOUT", "90"))
+
+    for attempt_model in [model, fallback] if fallback and fallback != model else [model]:
+        for token_field in ["max_completion_tokens", "max_tokens"]:
+            try:
+                resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={
+                        "model": attempt_model,
+                        token_field: 6000,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                        "temperature": 0.2,
+                    },
+                    timeout=(10, timeout),
+                )
+                if resp.status_code == 200:
+                    content = resp.json()["choices"][0]["message"]["content"]
+                    if content and content.strip():
+                        return content
+                print(f"[gpt55_integrate] {attempt_model} returned status {resp.status_code}: {resp.text[:200]}")
+            except requests.exceptions.Timeout:
+                print(f"[gpt55_integrate] {attempt_model} timed out after {timeout}s")
+            except Exception as exc:
+                print(f"[gpt55_integrate] {attempt_model} failed: {type(exc).__name__}: {exc}")
 
     return structured_summary
 
@@ -1172,18 +1181,17 @@ def ingest_pipeline(
                 yield _event("summary_progress", chars=total_chars)
         yield _event("status", stage="summary", message=f"GPT-5.5 summary done — {len(structured_summary):,} chars")
 
-        # ── 5. Final integration via XAI Grok ────────────────────────────
+        # ── 5. Final integration via GPT-5.5 ─────────────────────────────
         slug = slug_hint or _slugify(metadata.get("title") or ocr_title or "paper")
-        backend = "xai-grok" if (os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")) else "structured-summary-passthrough"
         if do_openai:
-            yield _event("status", stage="integrate", message=f"Final integration via {backend}…")
-            body = xai_integrate(structured_summary, metadata, source_info, slug)
-            if body == structured_summary and backend == "xai-grok":
-                yield _event("status", stage="integrate", message="Grok integration unavailable — using GPT-5.5 structured summary")
+            yield _event("status", stage="integrate", message="Final integration via GPT-5.5…")
+            body = gpt55_integrate(structured_summary, metadata, source_info, slug)
+            if body == structured_summary:
+                yield _event("status", stage="integrate", message="GPT-5.5 integration unavailable — using raw structured summary")
             body = normalize_page_body(body, metadata.get("title") or slug)
             yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
         else:
-            yield _event("status", stage="integrate", message="Final integration skipped — using GPT-5.5 structured summary")
+            yield _event("status", stage="integrate", message="Final integration skipped — using raw structured summary")
             body = normalize_page_body(structured_summary, metadata.get("title") or slug)
 
         # ── 6. Write files ────────────────────────────────────────────────
