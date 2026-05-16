@@ -528,11 +528,13 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
                     chunk = json.loads(data)
                 except json.JSONDecodeError:
                     continue
-                token = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content") or ""
-                if not token:
-                    continue
-                full_text += token
-                yield ("token", token, len(full_text))
+                choice = (chunk.get("choices") or [{}])[0]
+                token = choice.get("delta", {}).get("content") or ""
+                if token:
+                    full_text += token
+                    yield ("token", token, len(full_text))
+                if choice.get("finish_reason"):
+                    break
 
             if full_text.strip():
                 yield ("done", full_text, len(full_text))
