@@ -2,7 +2,7 @@
 title: "Optical coherence tomography imaging during PCI impacts physician decision-making"
 type: paper
 status: active
-updated: 2026-05-10
+updated: 2026-05-15
 year: 2015
 source_url: "https://doi.org/10.1093/eurheartj/ehv367"
 pmcid: "PMC4677272"

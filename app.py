@@ -28,6 +28,19 @@ from wiki_loader import WikiRepository
 
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load local .env values for the paper-ingest pipeline regardless of how Flask is started.
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if not _line or _line.startswith("#") or "=" not in _line:
+            continue
+        _k, _v = _line.split("=", 1)
+        _k, _v = _k.strip(), _v.strip().strip('"').strip("'")
+        if _k and _k not in os.environ:
+            os.environ[_k] = _v
+
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates_html"),
@@ -212,6 +225,50 @@ def add_paper_page():
     return render_template("add-paper.html")
 
 
+@app.route("/api/papers/related")
+def papers_related():
+    group = (request.args.get("group") or "").strip().lower()
+    graph = repo.paper_graph_data()
+    nodes = graph.get("nodes") or []
+
+    group_tags = {
+        "stable-cad": {"stable-cad", "chronic-coronary-disease"},
+        "acs": {"acs", "stemi", "nstemi", "acute-coronary-syndrome"},
+        "imaging-guided-pci": {"ivus", "oct", "imaging-guided-pci", "intravascular-imaging"},
+        "physiology-guided-pci": {"ffr", "ifr", "physiology-guided-pci", "coronary-physiology"},
+        "antiplatelet": {"antiplatelet", "dapt", "dual-antiplatelet", "antithrombotic"},
+        "af-pci": {"atrial-fibrillation", "af-pci", "anticoagulation"},
+        "structural-heart": {"tavr", "structural-heart", "aortic-stenosis", "tavi", "mitral"},
+        "lipid-prevention": {"lipid", "lipid-prevention", "pcsk9", "statin", "prevention", "glp1"},
+        "heart-failure": {"heart-failure", "sglt2", "hfref", "hfpef"},
+    }
+    wanted = group_tags.get(group)
+    if wanted:
+        nodes = [n for n in nodes if wanted & set(n.get("tags") or [])]
+    elif group and group not in {"all", ""}:
+        nodes = []
+
+    def _int_value(value):
+        try:
+            return int(value) if value is not None else 0
+        except (TypeError, ValueError):
+            return 0
+
+    nodes = sorted(nodes, key=lambda n: (-_int_value(n.get("citations")), -_int_value(n.get("year"))))
+    papers = [
+        {
+            "path": n["id"],
+            "title": n.get("title"),
+            "year": n.get("year"),
+            "group": n.get("group"),
+            "citations": n.get("citations"),
+            "tags": n.get("tags") or [],
+        }
+        for n in nodes[:30]
+    ]
+    return jsonify({"group": group or "all", "count": len(nodes), "papers": papers})
+
+
 @app.route("/api/papers/ingest", methods=["POST"])
 def papers_ingest():
     from paper_ingest import ingest_pipeline
@@ -230,12 +287,28 @@ def papers_ingest():
     if not url and not pdf_bytes:
         return jsonify({"error": "Provide either a URL or upload a PDF"}), 400
 
+    def _flag(name: str, default: bool = True) -> bool:
+        value = request.form.get(name)
+        if value is None:
+            return default
+        return value not in {"0", "false", "no", "off", ""}
+
+    group_hint = (request.form.get("group") or "").strip().lower() or None
+    do_citation = _flag("do_citation")
+    do_openai = _flag("do_openai")
+    do_autopush = _flag("do_autopush")
+
     def stream():
         for name, payload in ingest_pipeline(
             url=url or None,
             pdf_bytes=pdf_bytes,
             title_hint=title_hint,
             slug_hint=slug_hint,
+            source_url=url or None,
+            group_hint=group_hint,
+            do_citation=do_citation,
+            do_openai=do_openai,
+            do_autopush=do_autopush,
         ):
             yield f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 

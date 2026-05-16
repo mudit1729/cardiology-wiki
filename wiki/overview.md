@@ -5,7 +5,7 @@ status: active
 tags:
   - overview
   - navigation
-updated: 2026-05-11
+updated: 2026-05-15
 ---
 
 # Cardiology Wiki Overview
@@ -14,7 +14,7 @@ This wiki is an early ingestion workspace for source-grounded summaries of cardi
 literature. It is **not** yet a complete cardiology guideline / trial / procedure
 encyclopedia, and it should not be used as a clinical reference.
 
-## Current State (2026-05-11)
+## Current State (2026-05-15)
 
 The live wiki contains:
 

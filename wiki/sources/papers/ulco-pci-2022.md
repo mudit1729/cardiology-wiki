@@ -2,7 +2,7 @@
 title: "ULCO PCI: Ultra-low Contrast vs Conventional PCI in ACS"
 type: paper
 status: active
-updated: 2026-05-10
+updated: 2026-05-15
 year: 2022
 source_url: "https://doi.org/10.1016/j.ihj.2022.08.004"
 pmcid: "PMC9647695"
@@ -66,7 +66,7 @@ In patients with acute coronary syndrome (ACS) and increased risk of contrast-in
 
 ## Relevance for Indian Practice
 - ULC-PCI may be relevant in resource-constrained settings where IVUS is less widely available, since only 17% of ULC-PCI cases used IVUS in this trial — but feasibility outside high-volume operators requires further study.
-- It is cost-effective, relying on operator skill and existing materials without needing expensive equipment.
+- It may be less equipment-intensive than routine intravascular-imaging-based ultra-low-contrast strategies, but a formal cost-effectiveness analysis is not provided by this small trial.
 - The high burden of chronic kidney disease (CKD) in Indian ACS patients, often leading to under-revascularization due to "renalism," makes this strategy particularly relevant.
 - The pre-hydration protocol (1 mL/kg/h saline for 12 hours pre- and 24 hours post-PCI) is feasible and inexpensive.
 - Conducted at ABVIMS, Dr RML Hospital, New Delhi, this single-center Indian study aligns with local practice patterns and patient demographics.

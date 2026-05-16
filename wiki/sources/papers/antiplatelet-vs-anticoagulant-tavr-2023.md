@@ -2,7 +2,7 @@
 title: "Single antiplatelet or anticoagulant followed by antiplatelet after TAVR"
 type: paper
 status: active
-updated: 2026-05-10
+updated: 2026-05-15
 year: 2023
 source_url: "https://doi.org/10.1136/bmjopen-2023-076781"
 pmcid: "PMC10668142"
@@ -38,7 +38,7 @@ In patients without anticoagulation indications who undergo successful transcath
 | Patients aged 18–85 years with severe aortic stenosis who underwent successful TAVR via femoral approach with self-expanding bioprosthetic valve, without anticoagulation indications | Oral anticoagulation (warfarin, target INR 1.8–2.5) for 6 months, followed by aspirin 75–100 mg for 6 months | Single-antiplatelet therapy (aspirin 75–100 mg) for 6 months, followed by aspirin 75–100 mg for 6 months | **Primary:** Net clinical benefit (composite of all-cause mortality, MI, stroke/TIA, peripheral artery thrombosis, intracardiac thrombosis, major bleeding [BARC 3a], disabling/life-threatening bleeding [BARC 3b,3c,5]) at 1 year; Bioprosthetic valve thrombosis (BPVT) on 4D-CT at 6 and 12 months |
 
 ## Key Results
-This is a protocol paper (BMJ Open 2023) with no results available yet. The TAORTA trial is ongoing with the following design parameters:
+This is a protocol paper (BMJ Open 2023). No outcome results are reported in the protocol, so no clinical practice change should be inferred from this page alone. The TAORTA trial design parameters are:
 
 - **Sample size:** 650 patients (325 per group) from 13 TAVR centers in China.
 - **Assumed event rates:** Net clinical benefit endpoint ~28% with SAPT vs ~16.9% with OAC; subclinical leaflet thrombosis ~15% with antiplatelet vs ~4% with OAC.

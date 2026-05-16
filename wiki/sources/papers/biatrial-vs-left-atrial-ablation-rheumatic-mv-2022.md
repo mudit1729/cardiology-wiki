@@ -2,7 +2,7 @@
 title: "Bi-atrial versus left atrial ablation in rheumatic mitral valve disease and non-paroxysmal AF"
 type: paper
 status: active
-updated: 2026-05-10
+updated: 2026-05-15
 year: 2022
 source_url: "https://doi.org/10.1136/bmjopen-2022-064861"
 pmcid: "PMC9710358"
@@ -39,7 +39,7 @@ In patients with rheumatic mitral valve disease and non-paroxysmal atrial fibril
 | **Outcome**    | **Primary:** Freedom from any recurrence of atrial tachyarrhythmias (AF, atrial flutter, AT ≥30s) off antiarrhythmic drugs at 12 months on 3-day Holter. **Key secondary:** Freedom from permanent pacemaker implantation at 12 months |
 
 ## Key Results
-This is a study protocol; no results are available yet. The trial began recruitment in May 2022, with expected completion of recruitment by April 2024 and follow-up by April 2025. The planned sample size is 320 patients (1:1 randomization, 144 per group + 10% withdrawal). Power calculations assume a primary endpoint of 70% freedom from atrial tachyarrhythmias in the left atrial group versus 85% in the bi-atrial group (90% power, one-sided α=0.05), and a key secondary endpoint of non-inferiority for permanent pacemaker implantation with a -5% margin (80% power, one-sided α=0.05). Hierarchical testing ensures the secondary endpoint is tested only if the primary endpoint is significant, preserving overall type I error at 5%.
+This is a study protocol; no outcome results are reported in the protocol, so no clinical practice change should be inferred from this page alone. The trial began recruitment in May 2022, with expected completion of recruitment by April 2024 and follow-up by April 2025. The planned sample size is 320 patients (1:1 randomization, 144 per group + 10% withdrawal). Power calculations assume a primary endpoint of 70% freedom from atrial tachyarrhythmias in the left atrial group versus 85% in the bi-atrial group (90% power, one-sided α=0.05), and a key secondary endpoint of non-inferiority for permanent pacemaker implantation with a -5% margin (80% power, one-sided α=0.05). Hierarchical testing ensures the secondary endpoint is tested only if the primary endpoint is significant, preserving overall type I error at 5%.
 
 ## What Changed?
 This trial is presented by its authors as a multicentre RCT designed to evaluate bi-atrial versus left atrial ablation in rheumatic mitral valve disease (distinct from degenerative mitral valve disease); verify the "first such trial" claim against trial registries before relying on it. Prior evidence was limited, with the only previous RCT (Wang et al., 2014) showing no superiority of bi-atrial ablation (p=0.09) and inconclusive pacemaker data due to small sample size. The trial mandates unified ablation tools (bipolar radiofrequency clamp + pen) and standardized lesion sets across 19 centres, with video review of surgeon technique before initiation. Patients with significant right heart pathology (RV dysfunction, moderate-severe TR, PASP >60 mmHg) are excluded; the protocol's stated rationale is that left atrial ablation alone may be inadequate in patients with severe right atrial remodelling. **No clinical practice change should be inferred until results are published.**

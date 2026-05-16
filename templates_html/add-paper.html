@@ -11,7 +11,7 @@
       <p class="lede">
         Paste a PubMed / NEJM / Lancet / JACC / arxiv link, or upload a PDF.
         The pipeline runs Mistral OCR &rarr; Semantic Scholar (XAI fallback) &rarr; DeepSeek
-        summarization &rarr; Grok final integration, and writes the wiki page automatically.
+        summarization &rarr; final integration, writes the wiki page, and can push it to GitHub.
       </p>
     </header>
 
@@ -39,6 +39,47 @@
         </div>
       </div>
 
+      <div class="field">
+        <label for="paper-group">Add to group <span class="muted">(optional)</span></label>
+        <select id="paper-group" name="group" class="chat-select">
+          <option value="">Auto-detect from paper</option>
+          <option value="stable-cad">Stable CAD</option>
+          <option value="acs">ACS / STEMI</option>
+          <option value="imaging-guided-pci">Imaging-Guided PCI</option>
+          <option value="physiology-guided-pci">Physiology-Guided PCI</option>
+          <option value="antiplatelet">Antiplatelets / DAPT</option>
+          <option value="af-pci">AF + PCI</option>
+          <option value="structural-heart">TAVR / Structural Heart</option>
+          <option value="lipid-prevention">Lipid / Prevention</option>
+          <option value="heart-failure">Heart Failure</option>
+        </select>
+        <small id="related-preview" class="muted">Select a group to preview related papers.</small>
+      </div>
+
+      <div class="toggle-list compact-toggle-list">
+        <label class="toggle-row">
+          <input type="checkbox" name="do_citation" value="1" checked>
+          <div class="toggle-body">
+            <strong>Citation lookup</strong>
+            <small>Semantic Scholar with XAI fallback.</small>
+          </div>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" name="do_openai" value="1" checked>
+          <div class="toggle-body">
+            <strong>Final integration</strong>
+            <small>Run the final LLM cleanup step after the structured summary.</small>
+          </div>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" name="do_autopush" value="1" checked>
+          <div class="toggle-body">
+            <strong>Commit + push</strong>
+            <small>Commit the new page and OCR cache, then push to GitHub.</small>
+          </div>
+        </label>
+      </div>
+
       <div class="add-paper-actions">
         <button type="submit" id="ingest-submit" class="primary-button">Run pipeline</button>
         <button type="button" id="ingest-reset" class="text-button">Reset</button>
@@ -53,6 +94,7 @@
         <div class="stage" data-stage="summary"><span class="stage-dot"></span>Summary</div>
         <div class="stage" data-stage="integrate"><span class="stage-dot"></span>Integration</div>
         <div class="stage" data-stage="write"><span class="stage-dot"></span>Write</div>
+        <div class="stage" data-stage="publish"><span class="stage-dot"></span>Publish</div>
       </div>
       <ul class="progress-log" id="progress-log"></ul>
       <div class="progress-result hidden" id="progress-result"></div>
@@ -69,6 +111,8 @@
   const log     = document.getElementById('progress-log');
   const result  = document.getElementById('progress-result');
   const stages  = panel.querySelectorAll('.stage');
+  const groupSelect = document.getElementById('paper-group');
+  const relatedPreview = document.getElementById('related-preview');
 
   function setStage(name, state) {
     const el = panel.querySelector(`.stage[data-stage="${name}"]`);
@@ -112,6 +156,23 @@
     stages.forEach(s => s.className = 'stage');
   });
 
+  groupSelect.addEventListener('change', async () => {
+    const group = groupSelect.value || 'all';
+    relatedPreview.textContent = 'Loading related papers...';
+    try {
+      const resp = await fetch(`/api/papers/related?group=${encodeURIComponent(group)}`);
+      const data = await resp.json();
+      const papers = data.papers || [];
+      if (!papers.length) {
+        relatedPreview.textContent = 'No existing papers in this group yet.';
+        return;
+      }
+      relatedPreview.textContent = `Related papers: ${papers.slice(0, 5).map(p => p.title || p.path).join(' · ')}`;
+    } catch (err) {
+      relatedPreview.textContent = 'Could not load related papers.';
+    }
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     submit.disabled = true;
@@ -122,6 +183,10 @@
     stages.forEach(s => s.className = 'stage');
 
     const fd = new FormData(form);
+    ['do_citation', 'do_openai', 'do_autopush'].forEach((key) => {
+      const checkbox = form.querySelector(`input[name="${key}"]`);
+      fd.set(key, checkbox && checkbox.checked ? '1' : '0');
+    });
 
     try {
       const resp = await fetch('/api/papers/ingest', { method: 'POST', body: fd });
@@ -169,6 +234,8 @@
                 <p><strong>${escapeHtml(data.title || data.slug)}</strong> — ${escapeHtml(String(data.citations || 0))} citations</p>
                 <p class="muted">Wiki page: <code>${escapeHtml(data.page_path)}</code></p>
                 <p class="muted">OCR cached: <code>${escapeHtml(data.ocr_path)}</code></p>
+                ${data.git_status === 'pushed' ? `<p class="muted">Pushed commit: <code>${escapeHtml(data.git_sha || '')}</code></p>` : ''}
+                ${data.git_status === 'failed' ? `<p class="muted log-error">Push failed; the files were written locally.</p>` : ''}
                 <a class="primary-button" href="/page/${encodeURI(data.page_path.replace(/\.md$/, ''))}">Open paper &rarr;</a>
               </div>`;
           } else if (eventName === 'error') {

@@ -2,7 +2,7 @@
 title: "Colchicine for symptomatic coronary artery disease after PCI"
 type: paper
 status: active
-updated: 2026-05-10
+updated: 2026-05-15
 year: 2022
 source_url: "https://doi.org/10.1136/openhrt-2021-001887"
 pmcid: "PMC8739658"
@@ -51,7 +51,7 @@ In patients with symptomatic coronary artery disease who have undergone percutan
 ## What Changed?
 - Colchicine showed a 27% relative risk reduction in MACE when added to standard therapy in post-PCI patients.
 - Key benefits included reductions in repeat vessel revascularisation (53%), stroke (50%), and stent thrombosis (50%).
-- Positioned as a cost-effective, low-risk adjunctive therapy for secondary prevention post-PCI.
+- Supports colchicine as a potentially low-cost adjunct for selected post-PCI patients, while dosing, safety, and implementation still require clinical judgment.
 - Updated evidence, including the COPS trial, focuses specifically on PCI patients rather than just medical management.
 
 ## What Did Not Change?

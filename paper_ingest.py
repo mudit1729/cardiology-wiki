@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -22,6 +24,8 @@ from typing import Generator, Tuple
 
 import requests
 
+
+_GIT_LOCK = threading.Lock()
 
 BASE_DIR = Path(__file__).resolve().parent
 GROUNDING_DIR = BASE_DIR / ".grounding" / "md_fc"
@@ -509,7 +513,8 @@ def _slugify(title: str) -> str:
     return (s or "paper")[:80]
 
 
-def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str = "") -> str:
+def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str = "",
+                       group_hint: str | None = None) -> str:
     title = metadata.get("title") or slug
     authors = metadata.get("authors") or []
     year = metadata.get("year") or "null"
@@ -521,6 +526,20 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     abs_url = source_info.get("abs_url")
     today = time.strftime("%Y-%m-%d")
     tags = auto_tag(title, body)
+    group_to_tag = {
+        "stable-cad": "stable-cad",
+        "acs": "acs",
+        "imaging-guided-pci": "imaging-guided-pci",
+        "physiology-guided-pci": "physiology-guided-pci",
+        "antiplatelet": "antiplatelet",
+        "af-pci": "af-pci",
+        "structural-heart": "structural-heart",
+        "lipid-prevention": "lipid-prevention",
+        "heart-failure": "heart-failure",
+    }
+    hinted_tag = group_to_tag.get(group_hint or "")
+    if hinted_tag and hinted_tag not in tags:
+        tags.append(hinted_tag)
 
     # Compute the canonical "open original" URL: prefer DOI > PMC > abs_url > pdf_url
     source_url = None
@@ -617,7 +636,175 @@ def xai_integrate(deepseek_summary: str, metadata: dict, source_info: dict, slug
 
 
 # ---------------------------------------------------------------------------
-# 6. Pipeline driver (yields events)
+# 6. Git commit + push for /add-paper
+# ---------------------------------------------------------------------------
+
+
+def _git(args: list[str], cwd: Path) -> Tuple[int, str]:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=str(cwd),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        return result.returncode, (result.stdout or "") + (result.stderr or "")
+    except Exception as exc:
+        return 1, f"{type(exc).__name__}: {exc}"
+
+
+def _github_repo_slug() -> str | None:
+    env = os.environ.get("GITHUB_REPO")
+    if env and "/" in env:
+        return env.strip().strip("/")
+
+    owner = os.environ.get("RAILWAY_GIT_REPO_OWNER")
+    name = os.environ.get("RAILWAY_GIT_REPO_NAME")
+    if owner and name:
+        return f"{owner}/{name}"
+
+    rc, origin_url = _git(["remote", "get-url", "origin"], BASE_DIR)
+    if rc == 0:
+        m = re.search(r"github\.com[:/]([^/]+/[^/.]+)(?:\.git)?", origin_url.strip())
+        if m:
+            return m.group(1)
+    return None
+
+
+def _push_via_contents_api(
+    *,
+    token: str,
+    repo: str,
+    branch: str,
+    files: list[tuple[str, bytes]],
+    commit_msg: str,
+    author_name: str,
+    author_email: str,
+) -> dict:
+    import base64
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "cardio-wiki-bot",
+    }
+    probe_url = f"https://api.github.com/repos/{repo}"
+    try:
+        probe = requests.get(probe_url, headers=headers, timeout=20)
+    except requests.RequestException as exc:
+        return {"ok": False, "stage": "contents-api", "output": f"Repo probe failed: {exc}"}
+    if probe.status_code != 200:
+        return {
+            "ok": False,
+            "stage": "contents-api",
+            "output": f"Repo probe GET {probe_url} -> HTTP {probe.status_code}: {probe.text[:300]}",
+        }
+
+    default_branch = (probe.json() or {}).get("default_branch")
+    if default_branch and default_branch != branch and not os.environ.get("GIT_BRANCH"):
+        branch = default_branch
+
+    base_url = f"https://api.github.com/repos/{repo}/contents"
+    last_sha = None
+    for rel_path, content in files:
+        existing_sha = None
+        get_url = f"{base_url}/{rel_path}?ref={branch}"
+        try:
+            existing = requests.get(get_url, headers=headers, timeout=30)
+            if existing.status_code == 200:
+                existing_sha = (existing.json() or {}).get("sha")
+        except requests.RequestException:
+            existing_sha = None
+
+        payload = {
+            "message": commit_msg,
+            "content": base64.b64encode(content).decode("ascii"),
+            "branch": branch,
+            "committer": {"name": author_name, "email": author_email},
+            "author": {"name": author_name, "email": author_email},
+        }
+        if existing_sha:
+            payload["sha"] = existing_sha
+        try:
+            updated = requests.put(f"{base_url}/{rel_path}", headers=headers, json=payload, timeout=60)
+        except requests.RequestException as exc:
+            return {"ok": False, "stage": "contents-api", "output": f"PUT {rel_path}: {exc}"}
+        if updated.status_code not in (200, 201):
+            return {
+                "ok": False,
+                "stage": "contents-api",
+                "output": f"PUT {rel_path} -> HTTP {updated.status_code}: {updated.text[:400]}",
+            }
+        last_sha = ((updated.json() or {}).get("commit") or {}).get("sha")
+    return {"ok": True, "sha": last_sha[:7] if last_sha else None, "via": "contents-api", "branch": branch}
+
+
+def commit_and_push_paper(slug: str, title: str, page_path: Path, ocr_path: Path) -> dict:
+    if os.environ.get("GIT_AUTOPUSH", "1") == "0":
+        return {"skipped": True, "reason": "GIT_AUTOPUSH=0"}
+
+    author_name = os.environ.get("GIT_AUTHOR_NAME") or "Cardio Wiki Bot"
+    author_email = os.environ.get("GIT_AUTHOR_EMAIL") or "cardio-wiki-bot@users.noreply.github.com"
+    branch = os.environ.get("GIT_BRANCH") or "main"
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    rel_page = page_path.relative_to(BASE_DIR).as_posix()
+    rel_ocr = ocr_path.relative_to(BASE_DIR).as_posix()
+
+    with _GIT_LOCK:
+        rc, _ = _git(["rev-parse", "--git-dir"], BASE_DIR)
+        if rc == 0:
+            rc, remotes = _git(["remote", "-v"], BASE_DIR)
+            if rc == 0 and "origin" in remotes:
+                rc, out = _git(["add", "--", rel_page, rel_ocr], BASE_DIR)
+                if rc != 0:
+                    return {"ok": False, "stage": "add", "output": out}
+                rc, _ = _git(["diff", "--cached", "--quiet"], BASE_DIR)
+                if rc == 0:
+                    return {"skipped": True, "reason": "no staged changes"}
+                commit_msg = (
+                    f"Add paper via /add-paper: {title}\n\n"
+                    f"slug: {slug}\nAuto-committed by the Cardio Wiki ingest pipeline."
+                )
+                rc, out = _git(
+                    ["-c", f"user.name={author_name}", "-c", f"user.email={author_email}",
+                     "commit", "-m", commit_msg],
+                    BASE_DIR,
+                )
+                if rc != 0:
+                    return {"ok": False, "stage": "commit", "output": out}
+                _, sha = _git(["rev-parse", "--short", "HEAD"], BASE_DIR)
+                sha = sha.strip()
+                _, origin_url = _git(["remote", "get-url", "origin"], BASE_DIR)
+                origin_url = origin_url.strip()
+                if token and origin_url.startswith("https://"):
+                    auth_url = re.sub(r"^https://([^@]+@)?", f"https://x-access-token:{token}@", origin_url)
+                    rc, out = _git(["push", auth_url, f"HEAD:{branch}"], BASE_DIR)
+                else:
+                    rc, out = _git(["push", "origin", f"HEAD:{branch}"], BASE_DIR)
+                if rc != 0:
+                    return {"ok": False, "stage": "push", "sha": sha, "output": out}
+                return {"ok": True, "sha": sha, "via": "git"}
+
+        if not token:
+            return {"skipped": True, "reason": "no .git/ and GITHUB_TOKEN not set"}
+        repo = _github_repo_slug()
+        if not repo:
+            return {"skipped": True, "reason": "GITHUB_REPO not set"}
+        return _push_via_contents_api(
+            token=token,
+            repo=repo,
+            branch=branch,
+            files=[(rel_page, page_path.read_bytes()), (rel_ocr, ocr_path.read_bytes())],
+            commit_msg=f"Add paper via /add-paper: {title}\n\nslug: {slug}",
+            author_name=author_name,
+            author_email=author_email,
+        )
+
+
+# ---------------------------------------------------------------------------
+# 7. Pipeline driver (yields events)
 # ---------------------------------------------------------------------------
 
 
@@ -632,6 +819,10 @@ def ingest_pipeline(
     title_hint: str | None = None,
     slug_hint: str | None = None,
     source_url: str | None = None,
+    group_hint: str | None = None,
+    do_citation: bool = True,
+    do_openai: bool = True,
+    do_autopush: bool = True,
 ) -> Generator[Tuple[str, dict], None, None]:
     try:
         # ── 1. Detect / acquire ────────────────────────────────────────────
@@ -687,22 +878,26 @@ def ingest_pipeline(
                     break
 
         # ── 3. Citation lookup ────────────────────────────────────────────
-        yield _event("status", stage="citation", message="Semantic Scholar — looking up metadata + citations…")
         metadata = None
-        if source_info.get("kind") == "arxiv":
-            metadata = semantic_scholar_lookup(arxiv_id=source_info["id"])
-        if not metadata and source_info.get("kind") == "doi":
-            metadata = semantic_scholar_lookup(doi=source_info["id"])
-        if not metadata and ocr_title:
-            metadata = semantic_scholar_lookup(title=ocr_title)
+        if do_citation:
+            yield _event("status", stage="citation", message="Semantic Scholar — looking up metadata + citations…")
+            if source_info.get("kind") == "arxiv":
+                metadata = semantic_scholar_lookup(arxiv_id=source_info["id"])
+            if not metadata and source_info.get("kind") == "doi":
+                metadata = semantic_scholar_lookup(doi=source_info["id"])
+            if not metadata and ocr_title:
+                metadata = semantic_scholar_lookup(title=ocr_title)
+        else:
+            yield _event("status", stage="citation", message="Citation lookup skipped")
         if not metadata:
             metadata = {"title": ocr_title or "Untitled paper", "authors": [], "year": None,
                         "venue": None, "citations": 0, "abstract": "", "external_ids": {}}
-            yield _event("status", stage="citation", message="Semantic Scholar miss — trying Grok web-search…")
-            est = xai_citation_estimate(metadata["title"])
-            if est is not None:
-                metadata["citations"] = est
-                yield _event("status", stage="citation", message=f"Grok estimate: ~{est} citations")
+            if do_citation:
+                yield _event("status", stage="citation", message="Semantic Scholar miss — trying Grok web-search…")
+                est = xai_citation_estimate(metadata["title"])
+                if est is not None:
+                    metadata["citations"] = est
+                    yield _event("status", stage="citation", message=f"Grok estimate: ~{est} citations")
         else:
             yield _event("status", stage="citation",
                          message=f"Found: {metadata.get('title','?')[:80]} · {metadata.get('citations',0)} citations")
@@ -735,9 +930,13 @@ def ingest_pipeline(
         # ── 5. Final integration via XAI Grok ────────────────────────────
         slug = slug_hint or _slugify(metadata.get("title") or ocr_title or "paper")
         backend = "xai-grok" if (os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")) else "deepseek-passthrough"
-        yield _event("status", stage="integrate", message=f"Final integration via {backend}…")
-        body = xai_integrate(deepseek_summary, metadata, source_info, slug)
-        yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
+        if do_openai:
+            yield _event("status", stage="integrate", message=f"Final integration via {backend}…")
+            body = xai_integrate(deepseek_summary, metadata, source_info, slug)
+            yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
+        else:
+            yield _event("status", stage="integrate", message="Final integration skipped — using DeepSeek summary")
+            body = deepseek_summary
 
         # ── 6. Write files ────────────────────────────────────────────────
         GROUNDING_DIR.mkdir(parents=True, exist_ok=True)
@@ -752,13 +951,27 @@ def ingest_pipeline(
             ocr_path = GROUNDING_DIR / f"{slug}.md"
             ocr_path.write_text(ocr_md, encoding="utf-8")
 
-        full_page = _build_frontmatter(metadata, slug, source_info, body=body) + body.lstrip("\n")
+        full_page = _build_frontmatter(metadata, slug, source_info, body=body, group_hint=group_hint) + body.lstrip("\n")
         page_path.write_text(full_page, encoding="utf-8")
 
         yield _event("status", stage="write", message=f"Wrote {page_path.relative_to(BASE_DIR)}")
+        git_result = {"skipped": True, "reason": "disabled"}
+        if do_autopush:
+            yield _event("status", stage="publish", message="Committing and pushing paper files…")
+            git_result = commit_and_push_paper(slug, metadata.get("title") or slug, page_path, ocr_path)
+            if git_result.get("ok"):
+                yield _event("status", stage="publish", message=f"Pushed commit {git_result.get('sha')}")
+            elif git_result.get("skipped"):
+                yield _event("status", stage="publish", message=f"Push skipped: {git_result.get('reason')}")
+            else:
+                yield _event("status", stage="publish", message=f"Push failed at {git_result.get('stage')}: {git_result.get('output', '')[:160]}")
+        else:
+            yield _event("status", stage="publish", message="Auto-push skipped")
         yield _event("done", slug=slug, page_path=str(page_path.relative_to(BASE_DIR)),
                      ocr_path=str(ocr_path.relative_to(BASE_DIR)),
                      citations=metadata.get("citations", 0),
-                     title=metadata.get("title") or slug)
+                     title=metadata.get("title") or slug,
+                     git_status=("pushed" if git_result.get("ok") else "skipped" if git_result.get("skipped") else "failed"),
+                     git_sha=git_result.get("sha"))
     except Exception as exc:
         yield _event("error", message=f"{type(exc).__name__}: {exc}")
