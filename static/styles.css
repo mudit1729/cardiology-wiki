@@ -1680,10 +1680,6 @@ img { max-width: 100%; border-radius: var(--radius-md); }
     height: calc(100vh - 56px);
   }
 
-  .chat-page > .chat-composer {
-    grid-column: 1;
-  }
-
   .chat-source-panel {
     position: fixed;
     top: 56px;
@@ -1823,13 +1819,9 @@ body:has(.chat-page) .mobile-bottom-nav {
 .chat-page {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   height: calc(100vh - 56px);
-}
-
-.chat-page > .chat-composer {
-  grid-column: 2;
 }
 
 .chat-source-panel {
@@ -1984,7 +1976,7 @@ body:has(.chat-page) .mobile-bottom-nav {
 
 .chat-workspace {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--bg);
