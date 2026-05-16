@@ -1680,6 +1680,10 @@ img { max-width: 100%; border-radius: var(--radius-md); }
     height: calc(100vh - 56px);
   }
 
+  .chat-page > .chat-composer {
+    grid-column: 1;
+  }
+
   .chat-source-panel {
     position: fixed;
     top: 56px;
@@ -1825,7 +1829,7 @@ body:has(.chat-page) .mobile-bottom-nav {
 }
 
 .chat-page > .chat-composer {
-  grid-column: 1 / -1;
+  grid-column: 2;
 }
 
 .chat-source-panel {
