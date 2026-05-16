@@ -18,7 +18,23 @@
     <form id="ingest-form" class="add-paper-form">
       <div class="field">
         <label for="paper-pdf">PDF file</label>
-        <input id="paper-pdf" name="pdf" type="file" accept="application/pdf" required autofocus>
+        <label class="pdf-picker" for="paper-pdf" id="pdf-picker">
+          <input id="paper-pdf" class="pdf-input" name="pdf" type="file" accept="application/pdf" required autofocus>
+          <span class="pdf-picker-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M12 18v-6"/>
+              <path d="m9 15 3 3 3-3"/>
+            </svg>
+          </span>
+          <span class="pdf-picker-copy">
+            <strong id="pdf-picker-title">Choose PDF</strong>
+            <small id="pdf-picker-meta">No file selected</small>
+          </span>
+          <button type="button" class="pdf-clear hidden" id="pdf-clear" aria-label="Remove selected PDF">Remove</button>
+        </label>
         <small>Upload the paper PDF directly. Metadata, title, and slug are inferred automatically.</small>
       </div>
 
@@ -96,6 +112,31 @@
   const stages  = panel.querySelectorAll('.stage');
   const groupSelect = document.getElementById('paper-group');
   const relatedPreview = document.getElementById('related-preview');
+  const paperPdf = document.getElementById('paper-pdf');
+  const pdfPicker = document.getElementById('pdf-picker');
+  const pdfPickerTitle = document.getElementById('pdf-picker-title');
+  const pdfPickerMeta = document.getElementById('pdf-picker-meta');
+  const pdfClear = document.getElementById('pdf-clear');
+
+  function formatBytes(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  function updatePdfPicker() {
+    const file = paperPdf.files && paperPdf.files[0];
+    if (!file) {
+      pdfPicker.classList.remove('has-file');
+      pdfPickerTitle.textContent = 'Choose PDF';
+      pdfPickerMeta.textContent = 'No file selected';
+      pdfClear.classList.add('hidden');
+      return;
+    }
+    pdfPicker.classList.add('has-file');
+    pdfPickerTitle.textContent = file.name;
+    pdfPickerMeta.textContent = `${formatBytes(file.size)} PDF selected`;
+    pdfClear.classList.remove('hidden');
+  }
 
   function setStage(name, state) {
     const el = panel.querySelector(`.stage[data-stage="${name}"]`);
@@ -132,11 +173,20 @@
 
   reset.addEventListener('click', () => {
     form.reset();
+    updatePdfPicker();
     panel.classList.add('hidden');
     log.innerHTML = '';
     result.classList.add('hidden');
     result.innerHTML = '';
     stages.forEach(s => s.className = 'stage');
+  });
+
+  paperPdf.addEventListener('change', updatePdfPicker);
+  pdfClear.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    paperPdf.value = '';
+    updatePdfPicker();
   });
 
   groupSelect.addEventListener('change', async () => {
@@ -158,6 +208,10 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!paperPdf.files || !paperPdf.files.length) {
+      paperPdf.reportValidity();
+      return;
+    }
     submit.disabled = true;
     log.innerHTML = '';
     result.classList.add('hidden');
