@@ -185,6 +185,7 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
     key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
     if not key:
         return None
+    timeout = int(os.environ.get("XAI_CITATION_TIMEOUT", "8"))
     prompt = (
         f"What is the approximate citation count for the paper titled \"{title}\""
         f"{' (' + str(year) + ')' if year else ''}? "
@@ -201,8 +202,9 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
                 "max_tokens": 32,
                 "temperature": 0,
             },
-            timeout=60,
+            timeout=timeout,
         )
+        resp.raise_for_status()
         text = resp.json()["choices"][0]["message"]["content"].strip()
         m = re.search(r"\d{1,7}", text)
         return int(m.group(0)) if m else None
@@ -421,6 +423,7 @@ def xai_year_estimate(title: str) -> int | None:
     key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
     if not key:
         return None
+    timeout = int(os.environ.get("XAI_CITATION_TIMEOUT", "8"))
     prompt = (
         f"What year was the paper titled \"{title}\" published? "
         "Return ONLY a 4-digit year (1990-2030) or the word UNKNOWN. No other text."
@@ -435,8 +438,9 @@ def xai_year_estimate(title: str) -> int | None:
                 "max_tokens": 16,
                 "temperature": 0,
             },
-            timeout=60,
+            timeout=timeout,
         )
+        resp.raise_for_status()
         text = resp.json()["choices"][0]["message"]["content"].strip()
         m = re.search(r"\b(19[89]\d|20[0-3]\d)\b", text)
         return int(m.group(1)) if m else None
@@ -933,6 +937,8 @@ def ingest_pipeline(
                 metadata = semantic_scholar_lookup(arxiv_id=source_info["id"])
             if not metadata and source_info.get("kind") == "doi":
                 metadata = semantic_scholar_lookup(doi=source_info["id"])
+            if not metadata and source_info.get("doi"):
+                metadata = semantic_scholar_lookup(doi=source_info["doi"])
             if not metadata and ocr_title:
                 metadata = semantic_scholar_lookup(title=ocr_title)
         else:
@@ -941,11 +947,13 @@ def ingest_pipeline(
             metadata = {"title": ocr_title or "Untitled paper", "authors": [], "year": None,
                         "venue": None, "citations": 0, "abstract": "", "external_ids": {}}
             if do_citation:
-                yield _event("status", stage="citation", message="Semantic Scholar miss — trying Grok web-search…")
+                yield _event("status", stage="citation", message="Semantic Scholar miss — trying quick Grok citation estimate…")
                 est = xai_citation_estimate(metadata["title"])
                 if est is not None:
                     metadata["citations"] = est
                     yield _event("status", stage="citation", message=f"Grok estimate: ~{est} citations")
+                else:
+                    yield _event("status", stage="citation", message="Grok citation estimate unavailable — continuing")
         else:
             yield _event("status", stage="citation",
                          message=f"Found: {metadata.get('title','?')[:80]} · {metadata.get('citations',0)} citations")
