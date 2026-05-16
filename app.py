@@ -600,9 +600,15 @@ def _start_scheduler():
         print(f"[scheduler] Failed to start: {e}")
 
 
-if not os.environ.get("WERKZEUG_RUN_MAIN") and not os.environ.get("FLASK_DEBUG"):
+def _maybe_start_scheduler():
+    if os.environ.get("WERKZEUG_RUN_MAIN"):
+        return
     _start_scheduler()
 
 
+_maybe_start_scheduler()
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8081")), debug=True)
+    port = int(os.environ.get("PORT", "8081"))
+    app.run(host="0.0.0.0", port=port)
