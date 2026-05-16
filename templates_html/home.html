@@ -3,31 +3,40 @@
 {% block title %}Home | {{ repo_title }}{% endblock %}
 
 {% block content %}
-  <section class="featured-section hero-featured">
-    <div class="section-heading">
-      <h2>Entry Points</h2>
-      <p class="eyebrow" style="margin:0">Coronary/PCI &middot; ACS &middot; Structural &middot; Valve/Rheumatic &middot; Devices &middot; India/LMIC</p>
-    </div>
-    <div class="featured-grid">
-      {% for page in featured %}
-        <a class="featured-card" href="{{ url_for('page', page_path=page.path) }}">
-          <strong>{{ page.title }}</strong>
-          {% if page.status %}
-            <span class="status-dot status-{{ page.status }}"></span>
-          {% endif %}
-          <p>{{ page.excerpt }}</p>
-        </a>
-      {% endfor %}
-    </div>
-  </section>
-
   <section class="collections-section">
     <div class="section-heading">
       <h2>Evidence Collections</h2>
       <a href="{{ url_for('papers') }}" class="see-all">View all evidence &rarr;</a>
     </div>
     <div class="collection-grid">
-      {% for name, papers in collections.items() %}
+      {% for name, papers in evidence.items() %}
+        <div class="collection-card">
+          <div class="collection-header">
+            <h3>{{ name }}</h3>
+            <span class="badge">{{ papers|length }}</span>
+          </div>
+          <ul class="collection-list">
+            {% for p in papers[:5] %}
+              <li>
+                <a href="{{ url_for('page', page_path=p.path) }}">{{ p.title }}</a>
+                {% if p.year %}<span class="year-tag">{{ p.year }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if papers|length > 5 %}
+            <p class="more-count">+{{ papers|length - 5 }} more</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="collections-section">
+    <div class="section-heading">
+      <h2>Domains</h2>
+    </div>
+    <div class="collection-grid">
+      {% for name, papers in domains.items() %}
         <div class="collection-card">
           <div class="collection-header">
             <h3>{{ name }}</h3>

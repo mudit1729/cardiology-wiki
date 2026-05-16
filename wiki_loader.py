@@ -337,6 +337,26 @@ class WikiRepository:
                 collections[f"Domain: {label}"] = matches
         return collections
 
+    def evidence_collections(self) -> dict[str, list[Page]]:
+        all_papers = self.papers()
+        collections: dict[str, list[Page]] = {}
+        for key, label in PAPER_TYPE_LABELS.items():
+            matches = [p for p in all_papers if p.paper_type == key]
+            if matches:
+                collections[label] = matches
+        return collections
+
+    def domain_collections(self) -> dict[str, list[Page]]:
+        all_papers = self.papers()
+        collections: dict[str, list[Page]] = {}
+        for key, label in DOMAIN_LABELS.items():
+            if key == "other":
+                continue
+            matches = [p for p in all_papers if p.domain == key]
+            if matches:
+                collections[label] = matches
+        return collections
+
     def legacy_paper_collections(self) -> dict[str, list[Page]]:
         all_papers = self.papers()
         collections: dict[str, list[Page]] = {label: [] for label in DOMAIN_LABELS.values()}
