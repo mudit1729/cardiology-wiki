@@ -826,35 +826,36 @@ def gpt55_integrate(structured_summary: str, metadata: dict, source_info: dict, 
     abs_url = source_info.get("abs_url") or source_info.get("pdf_url")
 
     system = (
-        "You are the editor for the Cardio Wiki, an interventional cardiology intelligence system. "
-        "Take the structured summary below and produce a polished, detailed Markdown wiki page body "
-        "(NO YAML frontmatter — that will be prepended separately).\n\n"
-        "Start with a level-1 heading using the paper title, then these sections as ## headings:\n"
+        "You are the editor for the Cardio Wiki, an interventional cardiology reference. "
+        "Produce a concise Markdown wiki page body (NO YAML frontmatter).\n\n"
+        "BREVITY IS CRITICAL. Write for a busy cardiologist — every sentence must earn its place. "
+        "No filler, no restating what the heading already says, no preamble sentences.\n\n"
+        "Start with a # heading using the paper title, then these ## sections:\n"
         "Clinical Question, PICO, Key Results, What Changed?, What Did Not Change?, "
         "How I Would Explain This to a Patient, Relevance for Indian Practice, Related Trials.\n\n"
-        "Do NOT include a 'Paper Type' or 'Connections' section.\n\n"
-        "Formatting rules:\n"
-        "- PICO must be a Markdown table with 4 rows (Population, Intervention, Comparator, Outcome). "
-        "Use **bold** on the Component column. Use padded column separators. Example:\n"
-        "| Component      | Description |\n"
-        "|----------------|-------------|\n"
-        "| **Population** | ... |\n"
-        "- Key Results: use bullet points with **bold** lead-ins and exact numbers. "
-        "Quote p-values, confidence intervals, hazard ratios, and NNT when available.\n"
-        "- What Changed? and What Did Not Change?: write full paragraphs (4-8 sentences each) "
-        "with specific clinical details, not short summaries.\n"
-        "- How I Would Explain This to a Patient: write a natural, conversational paragraph "
-        "as if speaking to a patient. 4-6 sentences.\n"
-        "- Relevance for Indian Practice: write a substantial paragraph covering cost (in ₹ where possible), "
-        "availability, training needs, follow-up feasibility, and population relevance. "
-        "Be specific to India.\n"
-        "- Related Trials: bullet list with trial name, brief description, and how it relates.\n\n"
-        "If the source is a protocol/design paper, preserve the statement that no outcome "
-        "results are reported, keep planned endpoints and sample-size assumptions separate "
-        "from results, and state that no practice change should be inferred yet.\n"
-        "Do not add unrelated coronary/PCI/ACS/antiplatelet content unless present in the summary. "
-        "Be clinically precise; do not invent claims. Preserve all specific numbers and statistics "
-        "from the structured summary."
+        "Do NOT include Paper Type or Connections sections.\n\n"
+        "Formatting:\n"
+        "- Clinical Question: one sentence.\n"
+        "- PICO: Markdown table, 4 rows. Bold the Component column. Keep each Description "
+        "under 30 words — focus on key inclusion criteria, not exclusions. Example:\n"
+        "| Component        | Description |\n"
+        "|------------------|-------------|\n"
+        "| **Population**   | Adults with rheumatic MV disease and persistent AF undergoing MV surgery |\n"
+        "| **Intervention** | Bi-atrial Cox-Maze IV ablation |\n"
+        "| **Comparator**   | Left atrial ablation alone |\n"
+        "| **Outcome**      | Freedom from atrial tachyarrhythmia at 12 months off AADs |\n"
+        "- Key Results: 3-5 bullets with **bold lead-in** and exact numbers "
+        "(p-values, CIs, HRs, NNT). For protocols, state no results yet, then list "
+        "design assumptions as a sub-section.\n"
+        "- What Changed?: 2-4 bullets with **bold lead-in**. Specific clinical implications.\n"
+        "- What Did Not Change?: 2-4 bullets. What remains unproven or unchanged.\n"
+        "- Patient explanation: 3-4 sentences, conversational, no jargon.\n"
+        "- Indian Practice: bullets with **bold category** labels "
+        "(Cost, Availability, Training, Population relevance). Use ₹ figures.\n"
+        "- Related Trials: bullets with **bold trial name**, one-line relevance each.\n\n"
+        "Protocol papers: state clearly that no outcomes are reported yet. "
+        "Keep design assumptions separate from results. No practice change should be inferred.\n"
+        "Do not add content not in the source summary. Preserve all statistics exactly."
     )
     user = (
         f"Title: {title}\nLink: {abs_url}\n\n"
@@ -878,7 +879,7 @@ def gpt55_integrate(structured_summary: str, metadata: dict, source_info: dict, 
         try:
             payload = {
                 "model": attempt_model,
-                token_field: 6000,
+                token_field: 3000,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
