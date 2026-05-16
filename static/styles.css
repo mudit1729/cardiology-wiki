@@ -2639,6 +2639,7 @@ body:has(.chat-page) .mobile-bottom-nav {
 }
 .log-body { color: var(--text); }
 .log-meta .log-body  { color: var(--accent); }
+.log-progress .log-body { color: var(--accent); }
 .log-error .log-body { color: var(--red); }
 
 .progress-result {

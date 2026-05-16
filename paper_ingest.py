@@ -4,8 +4,8 @@ Stream events as we move through:
   1. Detect / acquire PDF (URL or upload)
   2. Mistral OCR  → ground-truth markdown
   3. Semantic Scholar lookup (with XAI fallback) → metadata + citations
-  4. DeepSeek summarization → structured wiki draft
-  5. OpenAI GPT-5.5 final integration → polished wiki page (with Claude/DeepSeek fallbacks)
+  4. OpenAI GPT-5.5 streaming summarization → structured wiki draft
+  5. XAI Grok final integration → polished wiki page
   6. Write wiki/sources/papers/{slug}.md + .grounding/md_fc/{slug}.md
 """
 
@@ -445,7 +445,7 @@ def xai_year_estimate(title: str) -> int | None:
 
 
 # ---------------------------------------------------------------------------
-# 4. DeepSeek summarization
+# 4. GPT-5.5 streaming summarization
 # ---------------------------------------------------------------------------
 
 
@@ -453,14 +453,13 @@ def _strip_frontmatter(md: str) -> str:
     return re.sub(r"^---\s*\n.*?\n---\s*\n", "", md, count=1, flags=re.DOTALL).strip()
 
 
-def deepseek_summarize(ocr_md: str, metadata: dict) -> str:
-    key = os.environ["DEEPSEEK_API_KEY"]
+def _summary_prompt(ocr_md: str, metadata: dict) -> str:
     title = metadata.get("title", "Unknown title")
     authors = ", ".join(metadata.get("authors") or [])
     year = metadata.get("year") or "unknown"
     venue = metadata.get("venue") or "unknown"
 
-    prompt = (
+    return (
         f"You are summarizing a research paper for the Cardio Wiki — an interventional "
         f"cardiology intelligence system covering practice-changing trials, guidelines, "
         f"PCI techniques, structural heart interventions, and India-specific practice.\n\n"
@@ -484,26 +483,69 @@ def deepseek_summarize(ocr_md: str, metadata: dict) -> str:
         f"--- OCR ---\n{ocr_md[:120000]}"
     )
 
-    base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-    model = os.environ.get("DEEPSEEK_INGEST_MODEL", "deepseek-chat")
-    resp = requests.post(
-        f"{base_url}/chat/completions",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={
-            "model": model,
+
+def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, str, int], None, None]:
+    """Yield GPT-5.5 summary tokens as ("token", text, total_chars), then ("done", full_text, total_chars)."""
+    key = os.environ["OPENAI_API_KEY"]
+    model = os.environ.get("OPENAI_SUMMARY_MODEL") or os.environ.get("OPENAI_INGEST_MODEL") or "gpt-5.5"
+    fallback = os.environ.get("OPENAI_INGEST_FALLBACK", "gpt-4o")
+    prompt = _summary_prompt(ocr_md, metadata)
+    attempts = [
+        (model, "max_completion_tokens"),
+        (model, "max_tokens"),
+    ]
+    if fallback and fallback != model:
+        attempts.append((fallback, "max_completion_tokens"))
+
+    last_error = ""
+    for attempt_model, token_field in attempts:
+        payload = {
+            "model": attempt_model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 8000,
-            "temperature": 0.2,
-        },
-        timeout=600,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return data["choices"][0]["message"]["content"]
+            token_field: 8000,
+            "stream": True,
+        }
+        try:
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=(30, 900),
+                stream=True,
+            )
+            if resp.status_code >= 400:
+                last_error = resp.text[:1000]
+                continue
+
+            full_text = ""
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                token = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+                if not token:
+                    continue
+                full_text += token
+                yield ("token", token, len(full_text))
+
+            if full_text.strip():
+                yield ("done", full_text, len(full_text))
+                return
+            last_error = "OpenAI returned an empty structured summary."
+        except Exception as exc:
+            last_error = str(exc)
+
+    raise RuntimeError(f"GPT-5.5 structured summary failed: {last_error}")
 
 
 # ---------------------------------------------------------------------------
-# 5. XAI Grok final integration (with DeepSeek fallback)
+# 5. XAI Grok final integration (with structured-summary fallback)
 # ---------------------------------------------------------------------------
 
 
@@ -582,7 +624,7 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     lines.append("clinical_review: false")
     lines.append("sources:")
     lines.append(f'  ocr: ".grounding/md_fc/{slug}.md"')
-    lines.append("  llm_drafted_by: deepseek")
+    lines.append("  llm_drafted_by: gpt-5.5")
     lines.append("  llm_reviewed_by: grok")
     lines.append(f'ingest_date: "{today}"')
     lines.append("---")
@@ -590,14 +632,14 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     return "\n".join(lines)
 
 
-def xai_integrate(deepseek_summary: str, metadata: dict, source_info: dict, slug: str) -> str:
-    """Final integration step. Tries XAI Grok, then DeepSeek passthrough."""
+def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, slug: str) -> str:
+    """Final integration step. Tries XAI Grok, then structured-summary passthrough."""
     title = metadata.get("title") or slug
     abs_url = source_info.get("abs_url") or source_info.get("pdf_url")
 
     system = (
         "You are the editor for the Cardio Wiki, an interventional cardiology intelligence system. "
-        "Take the DeepSeek summary below and produce a clean, Markdown-only wiki page body "
+        "Take the structured summary below and produce a clean, Markdown-only wiki page body "
         "(NO YAML frontmatter — that will be prepended separately). "
         "Start with a level-1 heading using the paper title, then sections: "
         "Clinical Question, PICO (table), Key Results, What Changed?, What Did Not Change?, "
@@ -606,7 +648,7 @@ def xai_integrate(deepseek_summary: str, metadata: dict, source_info: dict, slug
     )
     user = (
         f"Title: {title}\nLink: {abs_url}\n\n"
-        f"--- DeepSeek summary ---\n{deepseek_summary}"
+        f"--- Structured summary ---\n{structured_summary}"
     )
 
     xai_key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
@@ -631,8 +673,8 @@ def xai_integrate(deepseek_summary: str, metadata: dict, source_info: dict, slug
         except Exception:
             pass
 
-    # Fallback: return DeepSeek output as the final body.
-    return deepseek_summary
+    # Fallback: return the structured summary as the final body.
+    return structured_summary
 
 
 # ---------------------------------------------------------------------------
@@ -922,21 +964,30 @@ def ingest_pipeline(
 
         yield _event("metadata", **{k: v for k, v in metadata.items() if k != "abstract"})
 
-        # ── 4. DeepSeek summarization ─────────────────────────────────────
-        yield _event("status", stage="summary", message="DeepSeek — producing structured summary (this takes 1-3 min)…")
-        deepseek_summary = deepseek_summarize(ocr_md, metadata)
-        yield _event("status", stage="summary", message=f"Summary done — {len(deepseek_summary):,} chars")
+        # ── 4. GPT-5.5 streaming summarization ───────────────────────────
+        yield _event("status", stage="summary", message="GPT-5.5 — streaming structured summary (this takes 1-3 min)…")
+        structured_summary = ""
+        last_summary_emit = 0
+        for kind, payload, total_chars in gpt55_summarize_stream(ocr_md, metadata):
+            if kind == "token":
+                if total_chars - last_summary_emit >= 500:
+                    yield _event("summary_progress", chars=total_chars)
+                    last_summary_emit = total_chars
+            elif kind == "done":
+                structured_summary = payload
+                yield _event("summary_progress", chars=total_chars)
+        yield _event("status", stage="summary", message=f"GPT-5.5 summary done — {len(structured_summary):,} chars")
 
         # ── 5. Final integration via XAI Grok ────────────────────────────
         slug = slug_hint or _slugify(metadata.get("title") or ocr_title or "paper")
-        backend = "xai-grok" if (os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")) else "deepseek-passthrough"
+        backend = "xai-grok" if (os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")) else "structured-summary-passthrough"
         if do_openai:
             yield _event("status", stage="integrate", message=f"Final integration via {backend}…")
-            body = xai_integrate(deepseek_summary, metadata, source_info, slug)
+            body = xai_integrate(structured_summary, metadata, source_info, slug)
             yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
         else:
-            yield _event("status", stage="integrate", message="Final integration skipped — using DeepSeek summary")
-            body = deepseek_summary
+            yield _event("status", stage="integrate", message="Final integration skipped — using GPT-5.5 structured summary")
+            body = structured_summary
 
         # ── 6. Write files ────────────────────────────────────────────────
         GROUNDING_DIR.mkdir(parents=True, exist_ok=True)

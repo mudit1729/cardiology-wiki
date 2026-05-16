@@ -10,7 +10,7 @@
       <h1>Add a paper</h1>
       <p class="lede">
         Upload a PDF. The pipeline runs Mistral OCR &rarr; Semantic Scholar
-        &rarr; DeepSeek summarization &rarr; final integration, writes the wiki page,
+        &rarr; GPT-5.5 structured summary &rarr; final integration, writes the wiki page,
         and can push it to GitHub.
       </p>
     </header>
@@ -117,6 +117,7 @@
   const pdfPickerTitle = document.getElementById('pdf-picker-title');
   const pdfPickerMeta = document.getElementById('pdf-picker-meta');
   const pdfClear = document.getElementById('pdf-clear');
+  let summaryProgressLine = null;
 
   function formatBytes(bytes) {
     if (!bytes) return '';
@@ -154,6 +155,7 @@
     });
   }
   function appendLog(text, kind = 'info') {
+    if (kind !== 'progress') summaryProgressLine = null;
     const li = document.createElement('li');
     li.className = `log-line log-${kind}`;
     const ts = document.createElement('span');
@@ -167,6 +169,23 @@
     log.appendChild(li);
     log.scrollTop = log.scrollHeight;
   }
+  function updateSummaryProgress(chars) {
+    const count = Number(chars || 0).toLocaleString();
+    if (!summaryProgressLine) {
+      summaryProgressLine = document.createElement('li');
+      summaryProgressLine.className = 'log-line log-progress';
+      const ts = document.createElement('span');
+      ts.className = 'log-ts';
+      ts.textContent = new Date().toLocaleTimeString();
+      const body = document.createElement('span');
+      body.className = 'log-body';
+      summaryProgressLine.append(ts, body);
+      log.appendChild(summaryProgressLine);
+    }
+    summaryProgressLine.querySelector('.log-body').textContent =
+      `GPT-5.5 structured summary streaming... ${count} chars`;
+    log.scrollTop = log.scrollHeight;
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -176,6 +195,7 @@
     updatePdfPicker();
     panel.classList.add('hidden');
     log.innerHTML = '';
+    summaryProgressLine = null;
     result.classList.add('hidden');
     result.innerHTML = '';
     stages.forEach(s => s.className = 'stage');
@@ -214,6 +234,7 @@
     }
     submit.disabled = true;
     log.innerHTML = '';
+    summaryProgressLine = null;
     result.classList.add('hidden');
     result.innerHTML = '';
     panel.classList.remove('hidden');
@@ -251,6 +272,8 @@
           if (eventName === 'status') {
             if (data.stage) activateStage(data.stage);
             appendLog(data.message || '');
+          } else if (eventName === 'summary_progress') {
+            updateSummaryProgress(data.chars || 0);
           } else if (eventName === 'source') {
             appendLog(`Source: ${data.kind}${data.id ? ' · ' + data.id : ''}`, 'info');
           } else if (eventName === 'metadata') {
