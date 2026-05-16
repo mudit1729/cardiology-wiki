@@ -197,7 +197,7 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
             "https://api.x.ai/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={
-                "model": "grok-3",
+                "model": "grok-4.2",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 32,
                 "temperature": 0,
@@ -529,7 +529,7 @@ def xai_year_estimate(title: str) -> int | None:
             "https://api.x.ai/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={
-                "model": "grok-3",
+                "model": "grok-4.2",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 16,
                 "temperature": 0,
@@ -843,14 +843,14 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
     )
 
     xai_key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
-    timeout = int(os.environ.get("XAI_INTEGRATION_TIMEOUT", "12"))
+    timeout = int(os.environ.get("XAI_INTEGRATION_TIMEOUT", "90"))
     if xai_key:
         try:
             resp = requests.post(
                 "https://api.x.ai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {xai_key}", "Content-Type": "application/json"},
                 json={
-                    "model": os.environ.get("XAI_INGEST_MODEL", "grok-3"),
+                    "model": os.environ.get("XAI_INGEST_MODEL", "grok-4.2"),
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
@@ -858,14 +858,16 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
                     "max_tokens": 6000,
                     "temperature": 0.2,
                 },
-                timeout=timeout,
+                timeout=(10, timeout),
             )
             if resp.status_code == 200:
                 return resp.json()["choices"][0]["message"]["content"]
-        except Exception:
-            pass
+            print(f"[xai_integrate] Grok returned status {resp.status_code}: {resp.text[:200]}")
+        except requests.exceptions.Timeout:
+            print(f"[xai_integrate] Grok timed out after {timeout}s")
+        except Exception as exc:
+            print(f"[xai_integrate] Grok failed: {type(exc).__name__}: {exc}")
 
-    # Fallback: return the structured summary as the final body.
     return structured_summary
 
 
