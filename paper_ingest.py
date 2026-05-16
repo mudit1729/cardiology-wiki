@@ -798,6 +798,8 @@ def normalize_page_body(body: str, title: str) -> str:
             clean,
             flags=re.DOTALL,
         )
+    clean = re.sub(r"\n## Paper Type\n.+?(?=\n## )", "\n", clean, count=1, flags=re.DOTALL)
+    clean = re.sub(r"\n## Connections\n.+?(?=\n## |\Z)", "\n", clean, count=1, flags=re.DOTALL)
     return clean.strip() + "\n"
 
 
@@ -825,17 +827,34 @@ def gpt55_integrate(structured_summary: str, metadata: dict, source_info: dict, 
 
     system = (
         "You are the editor for the Cardio Wiki, an interventional cardiology intelligence system. "
-        "Take the structured summary below and produce a clean, Markdown-only wiki page body "
-        "(NO YAML frontmatter — that will be prepended separately). "
-        "Start with a level-1 heading using the paper title, then sections: "
-        "Paper Type, Clinical Question, PICO (table), Key Results, What Changed?, "
-        "What Did Not Change?, How I Would Explain This to a Patient, "
-        "Relevance for Indian Practice, Related Trials. "
+        "Take the structured summary below and produce a polished, detailed Markdown wiki page body "
+        "(NO YAML frontmatter — that will be prepended separately).\n\n"
+        "Start with a level-1 heading using the paper title, then these sections as ## headings:\n"
+        "Clinical Question, PICO, Key Results, What Changed?, What Did Not Change?, "
+        "How I Would Explain This to a Patient, Relevance for Indian Practice, Related Trials.\n\n"
+        "Do NOT include a 'Paper Type' or 'Connections' section.\n\n"
+        "Formatting rules:\n"
+        "- PICO must be a Markdown table with 4 rows (Population, Intervention, Comparator, Outcome). "
+        "Use **bold** on the Component column. Use padded column separators. Example:\n"
+        "| Component      | Description |\n"
+        "|----------------|-------------|\n"
+        "| **Population** | ... |\n"
+        "- Key Results: use bullet points with **bold** lead-ins and exact numbers. "
+        "Quote p-values, confidence intervals, hazard ratios, and NNT when available.\n"
+        "- What Changed? and What Did Not Change?: write full paragraphs (4-8 sentences each) "
+        "with specific clinical details, not short summaries.\n"
+        "- How I Would Explain This to a Patient: write a natural, conversational paragraph "
+        "as if speaking to a patient. 4-6 sentences.\n"
+        "- Relevance for Indian Practice: write a substantial paragraph covering cost (in ₹ where possible), "
+        "availability, training needs, follow-up feasibility, and population relevance. "
+        "Be specific to India.\n"
+        "- Related Trials: bullet list with trial name, brief description, and how it relates.\n\n"
         "If the source is a protocol/design paper, preserve the statement that no outcome "
         "results are reported, keep planned endpoints and sample-size assumptions separate "
-        "from results, and state that no practice change should be inferred yet. "
-        "Do not add unrelated coronary/PCI/ACS/antiplatelet content unless present in the "
-        "summary. Be clinically precise; do not invent claims. Keep paragraphs tight."
+        "from results, and state that no practice change should be inferred yet.\n"
+        "Do not add unrelated coronary/PCI/ACS/antiplatelet content unless present in the summary. "
+        "Be clinically precise; do not invent claims. Preserve all specific numbers and statistics "
+        "from the structured summary."
     )
     user = (
         f"Title: {title}\nLink: {abs_url}\n\n"
