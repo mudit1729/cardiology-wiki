@@ -20,6 +20,36 @@ LOG_ENTRY_RE = re.compile(
 )
 IGNORE_PARTS = {".git", ".venv", "__pycache__", "static", "templates_html", ".grounding", ".claude", "node_modules"}
 ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
+PAPER_TYPE_LABELS = {
+    "trial": "Trials",
+    "protocol": "Protocols",
+    "guideline": "Guidelines",
+    "consensus": "Consensus",
+    "meta-analysis": "Meta-analyses",
+    "registry": "Registries",
+    "cohort-study": "Cohort Studies",
+    "diagnostic-study": "Diagnostic Studies",
+    "device-study": "Device Studies",
+    "technical-paper": "Technical Papers",
+    "review": "Reviews",
+    "editorial": "Editorials",
+    "case-report": "Case Reports",
+    "procedure": "Procedures",
+}
+DOMAIN_LABELS = {
+    "stable-cad": "Stable CAD",
+    "acs": "ACS / STEMI",
+    "imaging": "Imaging-Guided PCI",
+    "physiology": "Physiology-Guided PCI",
+    "antiplatelet": "Antiplatelets / DAPT",
+    "af-ep": "AF / EP",
+    "af-pci": "AF + PCI",
+    "structural": "TAVR / Structural Heart",
+    "valve-rheumatic": "Valve / Rheumatic",
+    "prevention": "Lipid / Prevention",
+    "heart-failure": "Heart Failure",
+    "other": "Other",
+}
 
 
 @dataclass
@@ -38,6 +68,9 @@ class Page:
     year: str = ""
     venue: str = ""
     citations: int = 0
+    paper_type: str = ""
+    evidence_group: str = ""
+    domain: str = ""
     meta: dict = field(default_factory=dict)
 
 
@@ -118,6 +151,8 @@ class WikiRepository:
                 citations_val = int(citations_val)
             except (ValueError, TypeError):
                 citations_val = 0
+            paper_type = self._classify_paper_type(meta, tags)
+            domain = self._classify_domain(tags)
 
             pages[path] = Page(
                 path=path,
@@ -134,6 +169,9 @@ class WikiRepository:
                 year=str(meta.get("year", "")),
                 venue=str(meta.get("venue", "")),
                 citations=citations_val,
+                paper_type=paper_type,
+                evidence_group=self._evidence_group(paper_type),
+                domain=domain,
                 meta=meta,
             )
 
@@ -255,60 +293,44 @@ class WikiRepository:
             reverse=True,
         )
 
+    def paper_filter_topics(self) -> list[tuple[str, str]]:
+        self.refresh()
+        papers = self.papers()
+        topics: list[tuple[str, str]] = [("all", "All Evidence")]
+        for key, label in PAPER_TYPE_LABELS.items():
+            if any(p.paper_type == key for p in papers):
+                topics.append((f"type:{key}", label))
+        for key, label in DOMAIN_LABELS.items():
+            if key != "other" and any(p.domain == key for p in papers):
+                topics.append((f"domain:{key}", label))
+        return topics
+
     def paper_collections(self) -> dict[str, list[Page]]:
         all_papers = self.papers()
-        collections: dict[str, list[Page]] = {
-            "Stable CAD": [],
-            "ACS / STEMI": [],
-            "Imaging-Guided PCI": [],
-            "Physiology-Guided PCI": [],
-            "Antiplatelets / DAPT": [],
-            "AF + PCI": [],
-            "TAVR / Structural Heart": [],
-            "Lipid / Prevention": [],
-            "Heart Failure": [],
-            "Procedures": [],
-            "Guidelines": [],
-            "Conferences": [],
-        }
+        collections: dict[str, list[Page]] = {}
+        for key, label in PAPER_TYPE_LABELS.items():
+            matches = [p for p in all_papers if p.paper_type == key]
+            if matches:
+                collections[f"Evidence: {label}"] = matches
+        for key, label in DOMAIN_LABELS.items():
+            matches = [p for p in all_papers if p.domain == key]
+            if matches:
+                collections[f"Domain: {label}"] = matches
+        return collections
+
+    def legacy_paper_collections(self) -> dict[str, list[Page]]:
+        all_papers = self.papers()
+        collections: dict[str, list[Page]] = {label: [] for label in DOMAIN_LABELS.values()}
         for p in all_papers:
-            if any(t in p.tags for t in ["stable-cad", "chronic-coronary-disease"]):
-                collections["Stable CAD"].append(p)
-            if any(t in p.tags for t in ["acs", "stemi", "nstemi", "acute-coronary-syndrome"]):
-                collections["ACS / STEMI"].append(p)
-            if any(t in p.tags for t in ["ivus", "oct", "imaging-guided-pci", "intravascular-imaging"]):
-                collections["Imaging-Guided PCI"].append(p)
-            if any(t in p.tags for t in ["ffr", "ifr", "physiology-guided-pci", "coronary-physiology"]):
-                collections["Physiology-Guided PCI"].append(p)
-            if any(t in p.tags for t in ["antiplatelet", "dapt", "dual-antiplatelet", "antithrombotic"]):
-                collections["Antiplatelets / DAPT"].append(p)
-            if any(t in p.tags for t in ["atrial-fibrillation", "af-pci", "anticoagulation"]):
-                collections["AF + PCI"].append(p)
-            if any(t in p.tags for t in ["tavr", "structural-heart", "aortic-stenosis", "tavi"]):
-                collections["TAVR / Structural Heart"].append(p)
-            if any(t in p.tags for t in ["lipid", "pcsk9", "statin", "prevention", "glp1"]):
-                collections["Lipid / Prevention"].append(p)
-            if any(t in p.tags for t in ["heart-failure", "sglt2", "hfref", "hfpef"]):
-                collections["Heart Failure"].append(p)
-            if p.page_type == "procedure":
-                collections["Procedures"].append(p)
-            if p.page_type == "guideline":
-                collections["Guidelines"].append(p)
-            if p.page_type == "conference":
-                collections["Conferences"].append(p)
-        # Fallback: any paper not yet bucketed goes into a "Source-Grounded Papers" collection
-        bucketed = {p.path for v in collections.values() for p in v}
-        unbucketed = [p for p in all_papers if p.page_type == "paper" and p.path not in bucketed]
-        if unbucketed:
-            collections["Source-Grounded Papers"] = unbucketed
+            collections[DOMAIN_LABELS.get(p.domain, "Other")].append(p)
         return {k: v for k, v in collections.items() if v}
 
     def stats(self) -> dict[str, object]:
         self.refresh()
         total = len(self._pages)
-        trials = len([p for p in self._pages.values() if p.page_type == "trial"])
-        guidelines = len([p for p in self._pages.values() if p.page_type == "guideline"])
-        procedures = len([p for p in self._pages.values() if p.page_type == "procedure"])
+        trials = len([p for p in self._pages.values() if p.paper_type == "trial"])
+        guidelines = len([p for p in self._pages.values() if p.paper_type == "guideline"])
+        procedures = len([p for p in self._pages.values() if p.paper_type == "procedure"])
         conferences = len([p for p in self._pages.values() if p.page_type == "conference"])
         concepts = len([p for p in self._pages.values() if p.page_type == "concept"])
         papers = len([p for p in self._pages.values() if p.page_type == "paper"])
@@ -324,37 +346,67 @@ class WikiRepository:
             "tags": tags,
         }
 
+    def _classify_paper_type(self, meta: dict, tags: list[str]) -> str:
+        explicit = str(meta.get("paper_type") or meta.get("study_status") or "").strip().lower()
+        if explicit in PAPER_TYPE_LABELS:
+            return explicit
+        page_type = str(meta.get("type") or "").strip().lower()
+        tag_set = set(tags)
+        if "protocol" in tag_set or explicit == "protocol":
+            return "protocol"
+        if "meta-analysis" in tag_set or "systematic-review" in tag_set:
+            return "meta-analysis"
+        if "registry" in tag_set:
+            return "registry"
+        if "review" in tag_set:
+            return "review"
+        if "case-report" in tag_set:
+            return "case-report"
+        if page_type in PAPER_TYPE_LABELS:
+            return page_type
+        if "rct" in tag_set or page_type == "trial":
+            return "trial"
+        return "trial" if page_type == "source-summary" else "review"
+
+    def _evidence_group(self, paper_type: str) -> str:
+        if paper_type in {"trial", "guideline", "consensus", "meta-analysis"}:
+            return "practice-changing"
+        if paper_type in {"protocol", "registry", "cohort-study", "diagnostic-study"}:
+            return "evidence-generating"
+        if paper_type in {"procedure", "technical-paper", "device-study"}:
+            return "clinical-operations"
+        return "context"
+
+    def _classify_domain(self, tags: list[str]) -> str:
+        tag_set = set(tags)
+        if tag_set & {"stable-cad", "chronic-coronary-disease"}:
+            return "stable-cad"
+        if tag_set & {"acs", "stemi", "nstemi", "acute-coronary-syndrome"}:
+            return "acs"
+        if tag_set & {"ivus", "oct", "imaging-guided-pci", "intravascular-imaging"}:
+            return "imaging"
+        if tag_set & {"ffr", "ifr", "physiology-guided-pci", "coronary-physiology"}:
+            return "physiology"
+        if tag_set & {"antiplatelet", "dapt", "dual-antiplatelet", "antithrombotic"}:
+            return "antiplatelet"
+        if tag_set & {"rheumatic-heart-disease", "rheumatic", "mitral"}:
+            return "valve-rheumatic"
+        if "af-pci" in tag_set:
+            return "af-pci"
+        if tag_set & {"atrial-fibrillation", "anticoagulation"}:
+            return "af-ep"
+        if tag_set & {"tavr", "structural-heart", "aortic-stenosis", "tavi"}:
+            return "structural"
+        if tag_set & {"lipid", "lipid-prevention", "pcsk9", "statin", "prevention", "glp1"}:
+            return "prevention"
+        if tag_set & {"heart-failure", "sglt2", "hfref", "hfpef"}:
+            return "heart-failure"
+        return "other"
+
     def paper_graph_data(self) -> dict:
         self.refresh()
         papers = {p.path: p for p in self._pages.values()
                   if p.page_type in ("trial", "guideline", "procedure", "conference", "paper", "source-summary")}
-
-        def get_group(p: Page) -> str:
-            if any(t in p.tags for t in ["stable-cad", "chronic-coronary-disease"]):
-                return "stable-cad"
-            if any(t in p.tags for t in ["acs", "stemi", "nstemi"]):
-                return "acs"
-            if any(t in p.tags for t in ["ivus", "oct", "imaging-guided-pci"]):
-                return "imaging"
-            if any(t in p.tags for t in ["ffr", "ifr", "physiology-guided-pci"]):
-                return "physiology"
-            if any(t in p.tags for t in ["antiplatelet", "dapt"]):
-                return "antiplatelet"
-            if any(t in p.tags for t in ["atrial-fibrillation", "af-pci"]):
-                return "af-pci"
-            if any(t in p.tags for t in ["tavr", "structural-heart"]):
-                return "structural"
-            if any(t in p.tags for t in ["lipid", "pcsk9", "statin", "prevention", "glp1"]):
-                return "prevention"
-            if any(t in p.tags for t in ["heart-failure", "sglt2"]):
-                return "heart-failure"
-            if p.page_type == "procedure":
-                return "procedure"
-            if p.page_type == "guideline":
-                return "guideline"
-            if p.page_type == "conference":
-                return "conference"
-            return "other"
 
         nodes = []
         for path, p in papers.items():
@@ -362,7 +414,12 @@ class WikiRepository:
                 "id": path,
                 "title": p.title,
                 "year": p.year,
-                "group": get_group(p),
+                "group": p.domain,
+                "domain": p.domain,
+                "domain_label": DOMAIN_LABELS.get(p.domain, "Other"),
+                "paper_type": p.paper_type,
+                "paper_type_label": PAPER_TYPE_LABELS.get(p.paper_type, p.paper_type.title()),
+                "evidence_group": p.evidence_group,
                 "citations": p.citations,
                 "tags": p.tags,
                 "url": f"/page/{path}",
@@ -389,28 +446,20 @@ class WikiRepository:
 
     def timeline_data(self) -> dict[str, list[dict]]:
         self.refresh()
-        directions = {
-            "Stable CAD": lambda p: any(t in p.tags for t in ["stable-cad", "chronic-coronary-disease"]),
-            "ACS / STEMI": lambda p: any(t in p.tags for t in ["acs", "stemi", "nstemi"]),
-            "Imaging-Guided PCI": lambda p: any(t in p.tags for t in ["ivus", "oct", "imaging-guided-pci"]),
-            "Physiology-Guided PCI": lambda p: any(t in p.tags for t in ["ffr", "ifr", "physiology-guided-pci"]),
-            "Antiplatelets": lambda p: any(t in p.tags for t in ["antiplatelet", "dapt"]),
-            "AF + PCI": lambda p: any(t in p.tags for t in ["atrial-fibrillation", "af-pci"]),
-            "TAVR / Structural": lambda p: any(t in p.tags for t in ["tavr", "structural-heart"]),
-            "Lipid / Prevention": lambda p: any(t in p.tags for t in ["lipid", "pcsk9", "statin", "prevention", "glp1"]),
-            "Heart Failure": lambda p: any(t in p.tags for t in ["heart-failure", "sglt2"]),
-        }
-
         result: dict[str, list[dict]] = {}
-        for direction, pred in directions.items():
+        for domain, direction in DOMAIN_LABELS.items():
             papers = [p for p in self._pages.values()
-                      if p.page_type in ("trial", "paper", "source-summary") and pred(p)]
+                      if p.page_type in ("trial", "guideline", "procedure", "conference", "paper", "source-summary") and p.domain == domain]
             papers.sort(key=lambda p: (p.year or "0000", p.title))
             result[direction] = [{
                 "path": p.path,
                 "title": p.title,
                 "year": p.year,
                 "citations": p.citations,
+                "paper_type": p.paper_type,
+                "paper_type_label": PAPER_TYPE_LABELS.get(p.paper_type, p.paper_type.title()),
+                "evidence_group": p.evidence_group,
+                "domain": p.domain,
                 "url": f"/page/{p.path}",
             } for p in papers]
 

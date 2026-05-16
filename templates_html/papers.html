@@ -5,41 +5,15 @@
 {% block content %}
   <section class="papers-page">
     <div class="section-heading">
-      <h1>Trials &amp; Evidence</h1>
+      <h1>Evidence Library</h1>
       <p class="muted">{{ papers|length }} entries{% if active_tag %} tagged <span class="tag-pill active">{{ active_tag }}</span>{% endif %}</p>
     </div>
 
-    {% if not active_tag %}
-      <div class="collection-chips">
-        <a href="{{ url_for('papers') }}" class="chip {% if not active_tag %}active{% endif %}">All</a>
-        <a href="{{ url_for('papers', tag='stable-cad') }}" class="chip">Stable CAD</a>
-        <a href="{{ url_for('papers', tag='acs') }}" class="chip">ACS/STEMI</a>
-        <a href="{{ url_for('papers', tag='imaging-guided-pci') }}" class="chip">Imaging PCI</a>
-        <a href="{{ url_for('papers', tag='physiology-guided-pci') }}" class="chip">Physiology PCI</a>
-        <a href="{{ url_for('papers', tag='antiplatelet') }}" class="chip">Antiplatelets</a>
-        <a href="{{ url_for('papers', tag='af-pci') }}" class="chip">AF+PCI</a>
-        <a href="{{ url_for('papers', tag='structural-heart') }}" class="chip">Structural</a>
-        <a href="{{ url_for('papers', tag='lipid-prevention') }}" class="chip">Prevention</a>
-        <a href="{{ url_for('papers', tag='heart-failure') }}" class="chip">Heart Failure</a>
-        <a href="{{ url_for('papers', tag='guideline') }}" class="chip">Guidelines</a>
-        <a href="{{ url_for('papers', tag='procedure') }}" class="chip">Procedures</a>
-      </div>
-    {% else %}
-      <div class="collection-chips">
-        <a href="{{ url_for('papers') }}" class="chip">All</a>
-        <a href="{{ url_for('papers', tag='stable-cad') }}" class="chip {% if active_tag == 'stable-cad' %}active{% endif %}">Stable CAD</a>
-        <a href="{{ url_for('papers', tag='acs') }}" class="chip {% if active_tag == 'acs' %}active{% endif %}">ACS/STEMI</a>
-        <a href="{{ url_for('papers', tag='imaging-guided-pci') }}" class="chip {% if active_tag == 'imaging-guided-pci' %}active{% endif %}">Imaging PCI</a>
-        <a href="{{ url_for('papers', tag='physiology-guided-pci') }}" class="chip {% if active_tag == 'physiology-guided-pci' %}active{% endif %}">Physiology PCI</a>
-        <a href="{{ url_for('papers', tag='antiplatelet') }}" class="chip {% if active_tag == 'antiplatelet' %}active{% endif %}">Antiplatelets</a>
-        <a href="{{ url_for('papers', tag='af-pci') }}" class="chip {% if active_tag == 'af-pci' %}active{% endif %}">AF+PCI</a>
-        <a href="{{ url_for('papers', tag='structural-heart') }}" class="chip {% if active_tag == 'structural-heart' %}active{% endif %}">Structural</a>
-        <a href="{{ url_for('papers', tag='lipid-prevention') }}" class="chip {% if active_tag == 'lipid-prevention' %}active{% endif %}">Prevention</a>
-        <a href="{{ url_for('papers', tag='heart-failure') }}" class="chip {% if active_tag == 'heart-failure' %}active{% endif %}">Heart Failure</a>
-        <a href="{{ url_for('papers', tag='guideline') }}" class="chip {% if active_tag == 'guideline' %}active{% endif %}">Guidelines</a>
-        <a href="{{ url_for('papers', tag='procedure') }}" class="chip {% if active_tag == 'procedure' %}active{% endif %}">Procedures</a>
-      </div>
-    {% endif %}
+    <div class="collection-chips">
+      {% for value, label in topics %}
+        <a href="{{ url_for('papers') if value == 'all' else url_for('papers', tag=value) }}" class="chip {% if active_tag == value or (value == 'all' and not active_tag) %}active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
 
     <div class="papers-grid">
       {% for p in papers %}
@@ -53,6 +27,7 @@
           <div class="paper-card-meta">
             {% if p.year %}<span class="meta-pill small">{{ p.year }}</span>{% endif %}
             {% if p.venue %}<span class="meta-pill small">{{ p.venue }}</span>{% endif %}
+            {% if p.paper_type %}<span class="meta-pill small">{{ p.paper_type }}</span>{% endif %}
             {% if p.citations %}
               <span class="citation-count">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>

@@ -161,11 +161,17 @@ def papers():
     collections = repo.paper_collections()
     tag_filter = request.args.get("tag", "").strip()
     if tag_filter:
-        all_papers = [p for p in all_papers if tag_filter in p.tags]
+        if tag_filter.startswith("type:"):
+            all_papers = [p for p in all_papers if p.paper_type == tag_filter[5:]]
+        elif tag_filter.startswith("domain:"):
+            all_papers = [p for p in all_papers if p.domain == tag_filter[7:]]
+        else:
+            all_papers = [p for p in all_papers if tag_filter in p.tags]
     return render_template(
         "papers.html",
         papers=all_papers,
         collections=collections,
+        topics=repo.paper_filter_topics(),
         active_tag=tag_filter,
     )
 
@@ -331,13 +337,17 @@ def chat():
                 "venue": paper.venue,
                 "citations": paper.citations,
                 "tags": paper.tags,
+                "paper_type": paper.paper_type,
+                "paper_type_label": paper.meta.get("paper_type") or paper.paper_type,
+                "evidence_group": paper.evidence_group,
+                "domain": paper.domain,
                 "excerpt": paper.excerpt,
             }
         )
     return render_template(
         "chat.html",
         papers=papers_for_chat,
-        topics=CHAT_TOPICS,
+        topics=repo.paper_filter_topics(),
         max_papers=CHAT_MAX_PAPERS,
     )
 
@@ -414,6 +424,9 @@ def _build_chat_context(paths: list[str]) -> tuple[str, list[dict[str, str]]]:
             f"## {page.title}\n"
             f"Link: [{page.title}](/page/{page.path})\n"
             f"Type: {page.page_type or 'unknown'}\n"
+            f"Paper type: {page.paper_type or 'unknown'}\n"
+            f"Evidence group: {page.evidence_group or 'unknown'}\n"
+            f"Domain: {page.domain or 'unknown'}\n"
             f"Year: {page.year or 'unknown'}\n"
             f"Tags: {', '.join(page.tags) if page.tags else 'none'}\n\n"
         )

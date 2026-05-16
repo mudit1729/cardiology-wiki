@@ -9,13 +9,25 @@
       <p class="muted">Trials and evidence grouped by research direction across time.</p>
     </div>
 
-    <div class="timeline-filters">
+    <div class="timeline-filters" data-filter-row="domain">
       <button class="chip active" onclick="toggleDirection(this, 'all')">All</button>
       {% for direction in timeline_data.keys() %}
         <button class="chip" onclick="toggleDirection(this, '{{ direction }}')">
           {{ direction }}
           <span class="badge small">{{ timeline_data[direction]|length }}</span>
         </button>
+      {% endfor %}
+    </div>
+    <div class="timeline-filters" data-filter-row="type">
+      <button class="chip active" onclick="toggleType(this, 'all')">All Types</button>
+      {% set ns = namespace(types={}) %}
+      {% for direction, papers in timeline_data.items() %}
+        {% for p in papers %}
+          {% set _ = ns.types.update({p.paper_type: p.paper_type_label}) %}
+        {% endfor %}
+      {% endfor %}
+      {% for key, label in ns.types.items() %}
+        <button class="chip" onclick="toggleType(this, '{{ key }}')">{{ label }}</button>
       {% endfor %}
     </div>
 
@@ -33,12 +45,13 @@
                 <div class="year-marker">{{ p.year }}</div>
                 {% set ns.prev_year = p.year %}
               {% endif %}
-              <a href="{{ p.url }}" class="timeline-node" data-year="{{ p.year }}">
+              <a href="{{ p.url }}" class="timeline-node" data-year="{{ p.year }}" data-paper-type="{{ p.paper_type }}">
                 <div class="timeline-dot"></div>
                 <div class="timeline-card">
                   <strong>{{ p.title }}</strong>
                   <div class="timeline-card-meta">
                     {% if p.year %}<span class="meta-pill small">{{ p.year }}</span>{% endif %}
+                    {% if p.paper_type_label %}<span class="meta-pill small">{{ p.paper_type_label }}</span>{% endif %}
                     {% if p.citations %}<span class="meta-pill small">{{ p.citations }} cit.</span>{% endif %}
                   </div>
                 </div>
@@ -52,7 +65,7 @@
 
   <script>
     function toggleDirection(el, direction) {
-      document.querySelectorAll('.timeline-filters .chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('[data-filter-row="domain"] .chip').forEach(c => c.classList.remove('active'));
       el.classList.add('active');
       document.querySelectorAll('.timeline-lane').forEach(lane => {
         if (direction === 'all') {
@@ -60,6 +73,19 @@
         } else {
           lane.style.display = lane.dataset.direction === direction ? '' : 'none';
         }
+      });
+      applyTypeFilter();
+    }
+    function toggleType(el, type) {
+      document.querySelectorAll('[data-filter-row="type"] .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      window.timelineTypeFilter = type;
+      applyTypeFilter();
+    }
+    function applyTypeFilter() {
+      const type = window.timelineTypeFilter || 'all';
+      document.querySelectorAll('.timeline-node').forEach(node => {
+        node.style.display = type === 'all' || node.dataset.paperType === type ? '' : 'none';
       });
     }
   </script>

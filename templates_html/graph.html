@@ -16,20 +16,29 @@
       </div>
     </div>
 
-    <div class="graph-controls">
-      <button class="chip active" data-group="all">All</button>
+    <div class="graph-controls" data-filter-row="domain">
+      <button class="chip active" data-domain="all">All Domains</button>
       <button class="chip" data-group="stable-cad">Stable CAD</button>
       <button class="chip" data-group="acs">ACS/STEMI</button>
       <button class="chip" data-group="imaging">Imaging PCI</button>
       <button class="chip" data-group="physiology">Physiology PCI</button>
       <button class="chip" data-group="antiplatelet">Antiplatelets</button>
       <button class="chip" data-group="af-pci">AF+PCI</button>
+      <button class="chip" data-group="af-ep">AF/EP</button>
+      <button class="chip" data-group="valve-rheumatic">Valve/Rheumatic</button>
       <button class="chip" data-group="structural">Structural</button>
       <button class="chip" data-group="prevention">Prevention</button>
       <button class="chip" data-group="heart-failure">Heart Failure</button>
-      <button class="chip" data-group="procedure">Procedures</button>
-      <button class="chip" data-group="guideline">Guidelines</button>
-      <button class="chip" data-group="conference">Conferences</button>
+    </div>
+    <div class="graph-controls" data-filter-row="type">
+      <button class="chip active" data-type="all">All Types</button>
+      <button class="chip" data-type="trial">Trials</button>
+      <button class="chip" data-type="protocol">Protocols</button>
+      <button class="chip" data-type="guideline">Guidelines</button>
+      <button class="chip" data-type="meta-analysis">Meta-analyses</button>
+      <button class="chip" data-type="registry">Registries</button>
+      <button class="chip" data-type="review">Reviews</button>
+      <button class="chip" data-type="procedure">Procedures</button>
     </div>
 
     <div class="graph-stats" id="graph-stats"></div>
@@ -77,6 +86,8 @@
       'physiology':    '#8b5cf6',
       'antiplatelet':  '#ec4899',
       'af-pci':        '#f97316',
+      'af-ep':         '#fb923c',
+      'valve-rheumatic':'#0ea5e9',
       'structural':    '#06b6d4',
       'prevention':    '#10b981',
       'heart-failure': '#14b8a6',
@@ -92,6 +103,8 @@
       'physiology':    'Physiology PCI',
       'antiplatelet':  'Antiplatelets',
       'af-pci':        'AF+PCI',
+      'af-ep':         'AF/EP',
+      'valve-rheumatic':'Valve/Rheumatic',
       'structural':    'Structural',
       'prevention':    'Prevention',
       'heart-failure': 'Heart Failure',
@@ -295,7 +308,8 @@
     });
 
     let focusedId = null;
-    let activeFilter = 'all';
+    let activeDomainFilter = 'all';
+    let activeTypeFilter = 'all';
 
     function focusNode(d) {
       focusedId = d.id;
@@ -333,6 +347,7 @@
         d.year ? `<span class="meta-pill small">${d.year}</span>` : '',
         d.citations ? `<span class="meta-pill small">${d.citations.toLocaleString()} citations</span>` : '',
         `<span class="meta-pill small" style="background:${groupColors[d.group]}22;color:${groupColors[d.group]}">${groupNames[d.group]}</span>`,
+        d.paper_type_label ? `<span class="meta-pill small">${d.paper_type_label}</span>` : '',
       ].join('');
       document.getElementById('focus-link').href = d.url;
 
@@ -361,7 +376,7 @@
     function clearFocus() {
       focusedId = null;
       focusPanel.classList.remove('active');
-      applyFilter(activeFilter);
+      applyFilter();
     }
 
     function zoomToNode(d) {
@@ -380,7 +395,7 @@
           <strong>${d.title}</strong>
           ${d.year ? `<span class="meta-pill small">${d.year}</span>` : ''}
           ${d.citations ? `<span class="meta-pill small">${d.citations.toLocaleString()} citations</span>` : ''}
-          <div style="margin-top:4px;font-size:0.78rem;color:var(--text-tertiary)">${(connCount[d.id] || 0)} connections &middot; ${groupNames[d.group]}</div>
+          <div style="margin-top:4px;font-size:0.78rem;color:var(--text-tertiary)">${(connCount[d.id] || 0)} connections &middot; ${groupNames[d.group]} &middot; ${d.paper_type_label || d.paper_type}</div>
         `;
         tooltip.style.display = 'block';
         tooltip.style.left = event.pageX + 14 + 'px';
@@ -410,15 +425,20 @@
 
     document.getElementById('focus-close').addEventListener('click', clearFocus);
 
-    function applyFilter(group) {
-      activeFilter = group;
+    function passesFilters(d) {
+      const domainOk = activeDomainFilter === 'all' || d.group === activeDomainFilter;
+      const typeOk = activeTypeFilter === 'all' || d.paper_type === activeTypeFilter;
+      return domainOk && typeOk;
+    }
+
+    function applyFilter() {
       focusedId = null;
       focusPanel.classList.remove('active');
 
       const nodeSet = new Set();
-      nodes.forEach(d => { if (group === 'all' || d.group === group) nodeSet.add(d.id); });
+      nodes.forEach(d => { if (passesFilters(d)) nodeSet.add(d.id); });
       const neighborSet = new Set(nodeSet);
-      if (group !== 'all') {
+      if (activeDomainFilter !== 'all' || activeTypeFilter !== 'all') {
         edges.forEach(e => {
           const s = typeof e.source === 'object' ? e.source.id : e.source;
           const t = typeof e.target === 'object' ? e.target.id : e.target;
@@ -428,7 +448,7 @@
       }
       node.transition().duration(300)
         .attr('opacity', d => {
-          if (group === 'all' || nodeSet.has(d.id)) return 1;
+          if (activeDomainFilter === 'all' && activeTypeFilter === 'all' || nodeSet.has(d.id)) return 1;
           if (neighborSet.has(d.id)) return 0.55;
           return 0.06;
         })
@@ -438,7 +458,7 @@
         .style('stroke-opacity', d => {
           const s = typeof d.source === 'object' ? d.source.id : d.source;
           const t = typeof d.target === 'object' ? d.target.id : d.target;
-          if (group === 'all') return 0.85;
+          if (activeDomainFilter === 'all' && activeTypeFilter === 'all') return 0.85;
           const inA = nodeSet.has(s), inB = nodeSet.has(t);
           if (inA && inB) return 0.95;
           if (inA || inB) return 0.45;
@@ -447,22 +467,31 @@
         .style('stroke-width', d => {
           const s = typeof d.source === 'object' ? d.source.id : d.source;
           const t = typeof d.target === 'object' ? d.target.id : d.target;
-          if (group === 'all') return 1.2;
+          if (activeDomainFilter === 'all' && activeTypeFilter === 'all') return 1.2;
           const inA = nodeSet.has(s), inB = nodeSet.has(t);
           return (inA && inB) ? 1.6 : (inA || inB) ? 1.0 : 0.6;
         });
 
       label.transition().duration(300)
-        .attr('opacity', d => (group === 'all' || d.group === group) ? 1 : 0.03);
+        .attr('opacity', d => passesFilters(d) ? 1 : 0.03);
 
       focusLabel.transition().duration(300).attr('opacity', 0);
     }
 
-    document.querySelectorAll('.graph-controls .chip').forEach(btn => {
+    document.querySelectorAll('[data-filter-row="domain"] .chip').forEach(btn => {
       btn.addEventListener('click', function() {
-        document.querySelectorAll('.graph-controls .chip').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('[data-filter-row="domain"] .chip').forEach(el => el.classList.remove('active'));
         this.classList.add('active');
-        applyFilter(this.dataset.group);
+        activeDomainFilter = this.dataset.domain || this.dataset.group || 'all';
+        applyFilter();
+      });
+    });
+    document.querySelectorAll('[data-filter-row="type"] .chip').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('[data-filter-row="type"] .chip').forEach(el => el.classList.remove('active'));
+        this.classList.add('active');
+        activeTypeFilter = this.dataset.type || 'all';
+        applyFilter();
       });
     });
 

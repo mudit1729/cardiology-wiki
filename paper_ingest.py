@@ -669,6 +669,9 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     abs_url = source_info.get("abs_url")
     today = time.strftime("%Y-%m-%d")
     tags = auto_tag(title, body)
+    paper_type = infer_paper_type(title, body)
+    if paper_type and paper_type not in tags:
+        tags.append(paper_type)
     group_to_tag = {
         "stable-cad": "stable-cad",
         "acs": "acs",
@@ -702,6 +705,7 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
         "status: active",
         f"updated: {today}",
         f"year: {year}",
+        f"paper_type: {paper_type}",
     ]
     if venue and venue != "null":
         lines.append(f'venue: "{venue}"')
@@ -759,6 +763,23 @@ def normalize_page_body(body: str, title: str) -> str:
             flags=re.DOTALL,
         )
     return clean.strip() + "\n"
+
+
+def infer_paper_type(title: str, body: str) -> str:
+    text = f"{title}\n{body[:4000]}".lower()
+    if "study protocol" in text or "protocol/design" in text or "no outcome results are reported in this protocol" in text:
+        return "protocol"
+    if "meta-analysis" in text or "systematic review" in text:
+        return "meta-analysis"
+    if "registry" in text:
+        return "registry"
+    if "guideline" in text:
+        return "guideline"
+    if "randomised controlled trial" in text or "randomized controlled trial" in text or " rct" in text:
+        return "trial"
+    if "review" in text:
+        return "review"
+    return "trial"
 
 
 def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, slug: str) -> str:

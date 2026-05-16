@@ -1,6 +1,6 @@
 import unittest
 
-from paper_ingest import auto_tag, extract_title_from_ocr, normalize_page_body, _summary_prompt
+from paper_ingest import auto_tag, extract_title_from_ocr, infer_paper_type, normalize_page_body, _summary_prompt
 
 
 class PaperIngestPromptTests(unittest.TestCase):
@@ -58,6 +58,12 @@ No outcome results are reported in this protocol.
         self.assertIn("| Component | Description |", normalized)
         self.assertIn("| Intervention | Bi-atrial ablation |", normalized)
         self.assertNotIn("Population Intervention Comparator Outcome", normalized)
+
+    def test_protocol_type_is_inferred_from_summary(self):
+        self.assertEqual(
+            infer_paper_type("ABLATION protocol", "No outcome results are reported in this protocol."),
+            "protocol",
+        )
 
 
 if __name__ == "__main__":
