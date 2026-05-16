@@ -16,27 +16,37 @@
       </div>
 
       <div class="chat-panel-controls">
-        <label class="field-label" for="domain-select">Domain</label>
-        <select id="domain-select" class="chat-select">
-          {% for value, label in domains %}
-            <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-        <label class="field-label" for="evidence-select">Evidence Type</label>
-        <select id="evidence-select" class="chat-select">
-          {% for value, label in evidence_types %}
-            <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-        <label class="field-label" for="paper-search">Filter</label>
-        <input id="paper-search" class="chat-search" type="search" placeholder="Evidence title or tag">
+        <input id="paper-search" class="chat-search" type="search" placeholder="Search evidence…">
         <div class="paper-actions">
           <button type="button" class="text-button" id="select-visible">Select visible</button>
           <button type="button" class="text-button" id="clear-selected">Clear</button>
         </div>
       </div>
 
-      <div class="paper-check-list" id="paper-list"></div>
+      <div class="chat-panel-body">
+        <div class="chat-filter-group">
+          <h3 class="chat-filter-heading">Evidence Collections</h3>
+          <div class="chat-filter-chips" id="evidence-chips">
+            {% for value, label in evidence_types %}
+              <button type="button" class="chip{{ ' active' if value == 'all' else '' }}" data-evidence="{{ value }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="chat-filter-group">
+          <h3 class="chat-filter-heading">Domains</h3>
+          <div class="chat-filter-chips" id="domain-chips">
+            {% for value, label in domains %}
+              <button type="button" class="chip{{ ' active' if value == 'all' else '' }}" data-domain="{{ value }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="chat-filter-group">
+          <h3 class="chat-filter-heading">Papers <span class="chat-paper-count" id="paper-count"></span></h3>
+          <div class="paper-check-list" id="paper-list"></div>
+        </div>
+      </div>
     </aside>
 
     <div class="chat-workspace">
@@ -78,21 +88,21 @@
     const panel = document.getElementById('source-panel');
     const openPanel = document.getElementById('open-panel');
     const closePanel = document.getElementById('close-panel');
-    const domainSelect = document.getElementById('domain-select');
-    const evidenceSelect = document.getElementById('evidence-select');
     const paperSearch = document.getElementById('paper-search');
     const paperList = document.getElementById('paper-list');
+    const paperCount = document.getElementById('paper-count');
     const selectedCount = document.getElementById('selected-count');
     const chatThread = document.getElementById('chat-thread');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
 
+    let activeDomain = 'all';
+    let activeEvidence = 'all';
+
     function matchesFilters(paper) {
-      const domain = domainSelect.value;
-      const evidenceType = evidenceSelect.value;
-      if (domain !== 'all' && paper.domain !== domain) return false;
-      if (evidenceType !== 'all' && paper.paper_type !== evidenceType) return false;
+      if (activeDomain !== 'all' && paper.domain !== activeDomain) return false;
+      if (activeEvidence !== 'all' && paper.paper_type !== activeEvidence) return false;
       return true;
     }
 
@@ -113,6 +123,7 @@
 
     function renderPaperList() {
       const visible = filteredPapers();
+      paperCount.textContent = `(${visible.length})`;
       paperList.innerHTML = '';
       visible.forEach((paper) => {
         const item = document.createElement('label');
@@ -503,14 +514,24 @@
 
     openPanel.addEventListener('click', () => panel.classList.add('open'));
     closePanel.addEventListener('click', () => panel.classList.remove('open'));
-    domainSelect.addEventListener('change', () => {
+
+    document.getElementById('evidence-chips').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-evidence]');
+      if (!btn) return;
+      activeEvidence = btn.dataset.evidence;
+      document.querySelectorAll('#evidence-chips .chip').forEach((c) => c.classList.toggle('active', c === btn));
       selected.clear();
       selectInitialPapers();
     });
-    evidenceSelect.addEventListener('change', () => {
+    document.getElementById('domain-chips').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-domain]');
+      if (!btn) return;
+      activeDomain = btn.dataset.domain;
+      document.querySelectorAll('#domain-chips .chip').forEach((c) => c.classList.toggle('active', c === btn));
       selected.clear();
       selectInitialPapers();
     });
+
     paperSearch.addEventListener('input', renderPaperList);
     document.getElementById('select-visible').addEventListener('click', () => {
       for (const paper of filteredPapers()) {
@@ -541,8 +562,6 @@
     if (window.matchMedia('(max-width: 980px)').matches) {
       panel.classList.remove('open');
     }
-    domainSelect.value = 'all';
-    evidenceSelect.value = 'all';
     selectInitialPapers();
   </script>
 {% endblock %}

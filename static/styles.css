@@ -1928,11 +1928,45 @@ body:has(.chat-page) .mobile-bottom-nav {
   color: var(--accent);
 }
 
-.paper-check-list {
+.chat-panel-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding: 0.35rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+.chat-filter-group {
+  margin-bottom: 0.75rem;
+}
+
+.chat-filter-heading {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.chat-paper-count {
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.chat-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.chat-filter-chips .chip {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.paper-check-list {
+  min-height: 0;
+  padding: 0.2rem 0;
 }
 
 .paper-check-item {
