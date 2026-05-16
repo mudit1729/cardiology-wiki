@@ -489,6 +489,7 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
     key = os.environ["OPENAI_API_KEY"]
     model = os.environ.get("OPENAI_SUMMARY_MODEL") or os.environ.get("OPENAI_INGEST_MODEL") or "gpt-5.5"
     fallback = os.environ.get("OPENAI_INGEST_FALLBACK", "gpt-4o")
+    read_timeout = int(os.environ.get("OPENAI_STREAM_READ_TIMEOUT", "45"))
     prompt = _summary_prompt(ocr_md, metadata)
     attempts = [
         (model, "max_completion_tokens"),
@@ -505,19 +506,19 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
             token_field: 8000,
             "stream": True,
         }
+        full_text = ""
         try:
             resp = requests.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
                 json=payload,
-                timeout=(30, 900),
+                timeout=(30, read_timeout),
                 stream=True,
             )
             if resp.status_code >= 400:
                 last_error = resp.text[:1000]
                 continue
 
-            full_text = ""
             for line in resp.iter_lines(decode_unicode=True):
                 if not line or not line.startswith("data:"):
                     continue
@@ -541,6 +542,9 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
                 return
             last_error = "OpenAI returned an empty structured summary."
         except Exception as exc:
+            if full_text.strip():
+                yield ("done", full_text, len(full_text))
+                return
             last_error = str(exc)
 
     raise RuntimeError(f"GPT-5.5 structured summary failed: {last_error}")
