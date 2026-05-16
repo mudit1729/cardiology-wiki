@@ -366,23 +366,15 @@ class WikiRepository:
 
     def stats(self) -> dict[str, object]:
         self.refresh()
-        total = len(self._pages)
-        trials = len([p for p in self._pages.values() if p.paper_type == "trial"])
-        guidelines = len([p for p in self._pages.values() if p.paper_type == "guideline"])
-        procedures = len([p for p in self._pages.values() if p.paper_type == "procedure"])
-        conferences = len([p for p in self._pages.values() if p.page_type == "conference"])
-        concepts = len([p for p in self._pages.values() if p.page_type == "concept"])
         papers = len([p for p in self._pages.values() if p.page_type == "paper"])
         tags = len(self.all_tags())
+        domains = len(self.domain_collections())
+        evidence_types = len(self.evidence_collections())
         return {
-            "total": total,
-            "trials": trials,
-            "guidelines": guidelines,
-            "procedures": procedures,
-            "conferences": conferences,
-            "concepts": concepts,
             "papers": papers,
             "tags": tags,
+            "domains": domains,
+            "evidence_types": evidence_types,
         }
 
     def _classify_paper_type(self, meta: dict, tags: list[str]) -> str:

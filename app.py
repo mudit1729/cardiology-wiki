@@ -96,18 +96,11 @@ def inject_globals() -> dict[str, object]:
 
 @app.route("/")
 def home():
-    groups = repo.grouped_pages()
-    recent = repo.recent_log_entries()
-    stats = repo.stats()
-    evidence = repo.evidence_collections()
-    domains = repo.domain_collections()
     return render_template(
         "home.html",
-        groups=groups,
-        recent=recent,
-        stats=stats,
-        evidence=evidence,
-        domains=domains,
+        stats=repo.stats(),
+        evidence=repo.evidence_collections(),
+        domains=repo.domain_collections(),
     )
 
 
