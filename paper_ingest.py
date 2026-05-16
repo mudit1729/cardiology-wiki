@@ -869,32 +869,38 @@ def gpt55_integrate(structured_summary: str, metadata: dict, source_info: dict, 
     fallback = os.environ.get("OPENAI_INTEGRATE_FALLBACK", "gpt-4o")
     timeout = int(os.environ.get("OPENAI_INTEGRATE_TIMEOUT", "90"))
 
-    for attempt_model in [model, fallback] if fallback and fallback != model else [model]:
-        for token_field in ["max_completion_tokens", "max_tokens"]:
-            try:
-                resp = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                    json={
-                        "model": attempt_model,
-                        token_field: 6000,
-                        "messages": [
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                        "temperature": 0.2,
-                    },
-                    timeout=(10, timeout),
-                )
-                if resp.status_code == 200:
-                    content = resp.json()["choices"][0]["message"]["content"]
-                    if content and content.strip():
-                        return content
-                print(f"[gpt55_integrate] {attempt_model} returned status {resp.status_code}: {resp.text[:200]}")
-            except requests.exceptions.Timeout:
-                print(f"[gpt55_integrate] {attempt_model} timed out after {timeout}s")
-            except Exception as exc:
-                print(f"[gpt55_integrate] {attempt_model} failed: {type(exc).__name__}: {exc}")
+    attempts = [(model, "max_completion_tokens")]
+    if fallback and fallback != model:
+        attempts.append((fallback, "max_completion_tokens"))
+        attempts.append((fallback, "max_tokens"))
+
+    for attempt_model, token_field in attempts:
+        try:
+            payload = {
+                "model": attempt_model,
+                token_field: 6000,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            }
+            if "gpt-5" not in attempt_model:
+                payload["temperature"] = 0.2
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=(10, timeout),
+            )
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    return content
+            print(f"[gpt55_integrate] {attempt_model} returned status {resp.status_code}: {resp.text[:200]}")
+        except requests.exceptions.Timeout:
+            print(f"[gpt55_integrate] {attempt_model} timed out after {timeout}s")
+        except Exception as exc:
+            print(f"[gpt55_integrate] {attempt_model} failed: {type(exc).__name__}: {exc}")
 
     return structured_summary
 
