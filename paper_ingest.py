@@ -1017,10 +1017,15 @@ def commit_and_push_paper(slug: str, title: str, page_path: Path, ocr_path: Path
     rel_ocr = ocr_path.relative_to(BASE_DIR).as_posix()
 
     with _GIT_LOCK:
-        rc, _ = _git(["rev-parse", "--git-dir"], BASE_DIR)
-        if rc == 0:
+        rc, git_dir_out = _git(["rev-parse", "--git-dir"], BASE_DIR)
+        has_git = rc == 0
+        if not has_git:
+            print(f"[git-push] rev-parse failed (cwd={BASE_DIR}): {git_dir_out}")
+        if has_git:
             rc, remotes = _git(["remote", "-v"], BASE_DIR)
-            if rc == 0 and "origin" in remotes:
+            if rc != 0 or "origin" not in remotes:
+                print(f"[git-push] no origin remote: {remotes}")
+            else:
                 rc, out = _git(["add", "--", rel_page, rel_ocr], BASE_DIR)
                 if rc != 0:
                     return {"ok": False, "stage": "add", "output": out}
@@ -1040,13 +1045,7 @@ def commit_and_push_paper(slug: str, title: str, page_path: Path, ocr_path: Path
                     return {"ok": False, "stage": "commit", "output": out}
                 _, sha = _git(["rev-parse", "--short", "HEAD"], BASE_DIR)
                 sha = sha.strip()
-                _, origin_url = _git(["remote", "get-url", "origin"], BASE_DIR)
-                origin_url = origin_url.strip()
-                if token and origin_url.startswith("https://"):
-                    auth_url = re.sub(r"^https://([^@]+@)?", f"https://x-access-token:{token}@", origin_url)
-                    rc, out = _git(["push", auth_url, f"HEAD:{branch}"], BASE_DIR)
-                else:
-                    rc, out = _git(["push", "origin", f"HEAD:{branch}"], BASE_DIR)
+                rc, out = _git(["push", "origin", f"HEAD:{branch}"], BASE_DIR)
                 if rc != 0:
                     return {"ok": False, "stage": "push", "sha": sha, "output": out}
                 return {"ok": True, "sha": sha, "via": "git"}
