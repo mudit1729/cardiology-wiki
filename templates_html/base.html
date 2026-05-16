@@ -36,6 +36,11 @@
       </nav>
 
       <div class="header-right">
+        <button class="hamburger" onclick="document.querySelector('.site-nav').classList.toggle('open')" title="Menu" aria-label="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
         <button class="search-trigger" onclick="document.getElementById('search-modal').showModal()" title="Search (Cmd+K)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
@@ -96,6 +101,12 @@
       const modal = document.getElementById('search-modal');
       modal.addEventListener('click', function(e) {
         if (e.target === modal) modal.close();
+      });
+      document.addEventListener('click', function(e) {
+        const nav = document.querySelector('.site-nav');
+        if (nav.classList.contains('open') && !e.target.closest('.site-nav') && !e.target.closest('.hamburger')) {
+          nav.classList.remove('open');
+        }
       });
     </script>
   </body>

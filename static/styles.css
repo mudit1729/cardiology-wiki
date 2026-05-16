@@ -101,6 +101,19 @@ img { max-width: 100%; border-radius: var(--radius-md); }
 .header-left { flex-shrink: 0; }
 .header-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
 
+.hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+}
+.hamburger:hover { background: var(--bg-hover); color: var(--text); }
+
 .brand {
   display: inline-flex;
   gap: 0.6rem;
@@ -1668,9 +1681,30 @@ img { max-width: 100%; border-radius: var(--radius-md); }
     position: static;
   }
 
+  .hamburger { display: inline-flex; }
+
   .site-nav {
     display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0.5rem;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
   }
+  .site-nav.open { display: flex; }
+  .site-nav .nav-link {
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+  }
+  .site-nav .nav-link:hover { background: var(--bg-hover); }
 
   .search-trigger span { display: none; }
   .brand-subtitle { display: none; }
