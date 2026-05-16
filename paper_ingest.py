@@ -493,7 +493,9 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
     key = os.environ["OPENAI_API_KEY"]
     model = os.environ.get("OPENAI_SUMMARY_MODEL") or os.environ.get("OPENAI_INGEST_MODEL") or "gpt-5.5"
     fallback = os.environ.get("OPENAI_INGEST_FALLBACK", "gpt-4o")
-    read_timeout = int(os.environ.get("OPENAI_STREAM_READ_TIMEOUT", "45"))
+    read_timeout = int(os.environ.get("OPENAI_STREAM_READ_TIMEOUT", "8"))
+    idle_timeout = int(os.environ.get("OPENAI_STREAM_IDLE_TIMEOUT", "8"))
+    max_stream_chars = int(os.environ.get("OPENAI_SUMMARY_MAX_STREAM_CHARS", "5000"))
     prompt = _summary_prompt(ocr_md, metadata)
     attempts = [
         (model, "max_completion_tokens"),
@@ -523,7 +525,10 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
                 last_error = resp.text[:1000]
                 continue
 
+            last_token_at = time.monotonic()
             for line in resp.iter_lines(decode_unicode=True):
+                if full_text and time.monotonic() - last_token_at >= idle_timeout:
+                    break
                 if not line or not line.startswith("data:"):
                     continue
                 data = line[5:].strip()
@@ -537,8 +542,9 @@ def gpt55_summarize_stream(ocr_md: str, metadata: dict) -> Generator[Tuple[str, 
                 token = choice.get("delta", {}).get("content") or ""
                 if token:
                     full_text += token
+                    last_token_at = time.monotonic()
                     yield ("token", token, len(full_text))
-                if choice.get("finish_reason"):
+                if choice.get("finish_reason") or len(full_text) >= max_stream_chars:
                     break
 
             if full_text.strip():
