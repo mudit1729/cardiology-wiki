@@ -424,7 +424,7 @@ TAG_KEYWORDS: list[tuple[str, list[str]]] = [
     ("ifr",                   ["iFR", "instantaneous wave-free"]),
     ("antiplatelet",          ["antiplatelet", "DAPT", "aspirin", "ticagrelor", "clopidogrel", "prasugrel"]),
     ("dapt",                  ["DAPT", "dual antiplatelet"]),
-    ("af-pci",                ["atrial fibrillation", "warfarin", "DOAC", "rivaroxaban", "apixaban", "dabigatran", "edoxaban"]),
+    ("af-pci",                ["atrial fibrillation pci", "af pci", "undergoing pci", "percutaneous coronary intervention"]),
     ("atrial-fibrillation",   ["atrial fibrillation"]),
     ("anticoagulation",       ["anticoagulation", "anticoagulant", "warfarin", "DOAC"]),
     ("tavr",                  ["TAVR", "TAVI", "transcatheter aortic valve"]),
@@ -454,6 +454,7 @@ def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]
     title_low = title.lower()
     body_low = body_excerpt[:12000].lower()
     matched: list[str] = ["paper"]
+    combined_low = f"{title_low}\n{body_low}"
 
     def is_excluded(kw_low: str) -> bool:
         # If every body occurrence is in an exclusion-criteria context, skip the tag.
@@ -468,11 +469,16 @@ def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]
     for tag, keywords in TAG_KEYWORDS:
         if tag in matched:
             continue
+        if tag == "af-pci" and not (
+            re.search(r"\b(atrial fibrillation|af)\b", combined_low)
+            and re.search(r"\b(pci|percutaneous coronary intervention)\b", combined_low)
+        ):
+            continue
         for kw in keywords:
             kw_low = kw.lower()
             in_title = re.search(rf"\b{re.escape(kw_low)}\b", title_low) is not None
             body_n = len(re.findall(rf"\b{re.escape(kw_low)}\b", body_low))
-            if (in_title or body_n >= 2) and not is_excluded(kw_low):
+            if (in_title or body_n >= 2) and (in_title or not is_excluded(kw_low)):
                 matched.append(tag)
                 break
         if len(matched) >= max_tags:
@@ -725,6 +731,34 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
+
+
+def normalize_page_body(body: str, title: str) -> str:
+    """Fix common LLM formatting drift before writing Markdown."""
+    clean = body.lstrip()
+    title_heading = f"# {title}"
+    if clean.startswith("# Summary for Cardio Wiki"):
+        clean = re.sub(r"^# Summary for Cardio Wiki\s*", f"{title_heading}\n\n", clean, count=1)
+    elif clean.startswith("# Summary"):
+        clean = re.sub(r"^# Summary[^\n]*\s*", f"{title_heading}\n\n", clean, count=1)
+    elif not clean.startswith("# "):
+        clean = f"{title_heading}\n\n{clean}"
+
+    if re.search(r"## PICO\s*\n\s*Population Intervention Comparator Outcome\s*\n", clean):
+        clean = re.sub(
+            r"## PICO\s*\n\s*Population Intervention Comparator Outcome\s*\n"
+            r"(.+?)\s+Bi-atrial ablation\s+Left atrial ablation\s+(.+?)(?=\n\s*##|\Z)",
+            "## PICO\n\n"
+            "| Component | Description |\n"
+            "|---|---|\n"
+            r"| Population | \1 |\n"
+            "| Intervention | Bi-atrial ablation |\n"
+            "| Comparator | Left atrial ablation |\n"
+            r"| Outcome | \2 |\n",
+            clean,
+            flags=re.DOTALL,
+        )
+    return clean.strip() + "\n"
 
 
 def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, slug: str) -> str:
@@ -1087,10 +1121,11 @@ def ingest_pipeline(
             body = xai_integrate(structured_summary, metadata, source_info, slug)
             if body == structured_summary and backend == "xai-grok":
                 yield _event("status", stage="integrate", message="Grok integration unavailable — using GPT-5.5 structured summary")
+            body = normalize_page_body(body, metadata.get("title") or slug)
             yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
         else:
             yield _event("status", stage="integrate", message="Final integration skipped — using GPT-5.5 structured summary")
-            body = structured_summary
+            body = normalize_page_body(structured_summary, metadata.get("title") or slug)
 
         # ── 6. Write files ────────────────────────────────────────────────
         GROUNDING_DIR.mkdir(parents=True, exist_ok=True)
