@@ -532,7 +532,11 @@ class WikiRepository:
                 target, anchor_slug = target_part, ""
 
             target = target.strip()
-            resolved = self._resolve_from_indexes(target) or target.strip().lstrip("/")
+            resolved = self._resolve_from_indexes(target)
+
+            if not resolved and target.startswith("."):
+                return label or Path(target).name.replace("-", " ").replace("_", " ").title()
+            resolved = resolved or target.strip().lstrip("/")
 
             if is_embed:
                 asset_path = resolved if any(resolved.endswith(suffix) for suffix in ASSET_SUFFIXES) else target
