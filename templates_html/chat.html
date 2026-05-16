@@ -16,14 +16,20 @@
       </div>
 
       <div class="chat-panel-controls">
-        <label class="field-label" for="topic-select">Topic</label>
-        <select id="topic-select" class="chat-select">
-          {% for value, label in topics %}
+        <label class="field-label" for="domain-select">Domain</label>
+        <select id="domain-select" class="chat-select">
+          {% for value, label in domains %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <label class="field-label" for="evidence-select">Evidence Type</label>
+        <select id="evidence-select" class="chat-select">
+          {% for value, label in evidence_types %}
             <option value="{{ value }}">{{ label }}</option>
           {% endfor %}
         </select>
         <label class="field-label" for="paper-search">Filter</label>
-        <input id="paper-search" class="chat-search" type="search" placeholder="Evidence title, domain, or tag">
+        <input id="paper-search" class="chat-search" type="search" placeholder="Evidence title or tag">
         <div class="paper-actions">
           <button type="button" class="text-button" id="select-visible">Select visible</button>
           <button type="button" class="text-button" id="clear-selected">Clear</button>
@@ -73,7 +79,8 @@
     const panel = document.getElementById('source-panel');
     const openPanel = document.getElementById('open-panel');
     const closePanel = document.getElementById('close-panel');
-    const topicSelect = document.getElementById('topic-select');
+    const domainSelect = document.getElementById('domain-select');
+    const evidenceSelect = document.getElementById('evidence-select');
     const paperSearch = document.getElementById('paper-search');
     const paperList = document.getElementById('paper-list');
     const selectedCount = document.getElementById('selected-count');
@@ -82,18 +89,18 @@
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
 
-    function matchesTopic(paper) {
-      const topic = topicSelect.value;
-      if (topic === 'all') return true;
-      if (topic.startsWith('type:')) return paper.paper_type === topic.slice(5);
-      if (topic.startsWith('domain:')) return paper.domain === topic.slice(7);
-      return paper.tags.includes(topic);
+    function matchesFilters(paper) {
+      const domain = domainSelect.value;
+      const evidenceType = evidenceSelect.value;
+      if (domain !== 'all' && paper.domain !== domain) return false;
+      if (evidenceType !== 'all' && paper.paper_type !== evidenceType) return false;
+      return true;
     }
 
     function filteredPapers() {
       const query = paperSearch.value.trim().toLowerCase();
       return papers.filter((paper) => {
-        if (!matchesTopic(paper)) return false;
+        if (!matchesFilters(paper)) return false;
         if (!query) return true;
         return paper.title.toLowerCase().includes(query)
           || paper.path.toLowerCase().includes(query)
@@ -497,7 +504,11 @@
 
     openPanel.addEventListener('click', () => panel.classList.add('open'));
     closePanel.addEventListener('click', () => panel.classList.remove('open'));
-    topicSelect.addEventListener('change', () => {
+    domainSelect.addEventListener('change', () => {
+      selected.clear();
+      selectInitialPapers();
+    });
+    evidenceSelect.addEventListener('change', () => {
       selected.clear();
       selectInitialPapers();
     });
@@ -531,7 +542,8 @@
     if (window.matchMedia('(max-width: 980px)').matches) {
       panel.classList.remove('open');
     }
-    topicSelect.value = 'all';
+    domainSelect.value = 'all';
+    evidenceSelect.value = 'all';
     selectInitialPapers();
   </script>
 {% endblock %}

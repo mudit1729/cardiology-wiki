@@ -311,6 +311,19 @@ class WikiRepository:
                 topics.append((f"domain:{key}", label))
         return topics
 
+    def chat_filter_options(self) -> dict[str, list[tuple[str, str]]]:
+        self.refresh()
+        domains: list[tuple[str, str]] = [("all", "All Domains")]
+        for key, label in DOMAIN_LABELS.items():
+            if key != "other":
+                domains.append((key, label))
+        evidence: list[tuple[str, str]] = [("all", "All Types")]
+        papers = self.papers()
+        for key, label in PAPER_TYPE_LABELS.items():
+            if any(p.paper_type == key for p in papers):
+                evidence.append((key, label))
+        return {"domains": domains, "evidence_types": evidence}
+
     def paper_collections(self) -> dict[str, list[Page]]:
         all_papers = self.papers()
         collections: dict[str, list[Page]] = {}

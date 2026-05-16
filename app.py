@@ -319,10 +319,12 @@ def chat():
                 "excerpt": paper.excerpt,
             }
         )
+    chat_filters = repo.chat_filter_options()
     return render_template(
         "chat.html",
         papers=papers_for_chat,
-        topics=repo.paper_filter_topics(),
+        domains=chat_filters["domains"],
+        evidence_types=chat_filters["evidence_types"],
         max_papers=CHAT_MAX_PAPERS,
     )
 
