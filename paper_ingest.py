@@ -218,6 +218,34 @@ def xai_citation_estimate(title: str, year: int | None = None) -> int | None:
 DOI_IN_OCR_RE = re.compile(r"\b(?:doi|DOI)[:\s]+\s*(10\.\d{4,9}/[^\s\)\]\>]+)", re.IGNORECASE)
 DOI_BARE_RE = re.compile(r"\b(10\.\d{4,9}/[A-Za-z0-9._\-/]+[A-Za-z0-9])")
 PMCID_IN_OCR_RE = re.compile(r"\b(PMC\d{5,10})\b")
+OCR_TITLE_NOISE = {
+    "open access",
+    "protocol",
+    "original research",
+    "check for updates",
+    "bmj",
+}
+OCR_TITLE_PREFIXES = (
+    "abstract",
+    "accepted",
+    "author affiliations",
+    "background",
+    "correspondence",
+    "doi",
+    "funding",
+    "preprint",
+    "prepublication",
+    "received",
+    "to cite",
+)
+OCR_TITLE_JOURNAL_PREFIXES = (
+    "bmj open ",
+    "open heart ",
+    "european heart journal ",
+    "journal of the american college of cardiology ",
+    "jacc ",
+    "circulation ",
+)
 
 
 def extract_doi_from_ocr(ocr_md: str) -> str | None:
@@ -235,6 +263,40 @@ def extract_pmcid_from_ocr(ocr_md: str) -> str | None:
     head = ocr_md[:8000]
     m = PMCID_IN_OCR_RE.search(head)
     return m.group(1) if m else None
+
+
+def _clean_ocr_title_candidate(line: str) -> str:
+    candidate = re.sub(r"\s+", " ", line.strip().lstrip("# ").strip())
+    for prefix in OCR_TITLE_JOURNAL_PREFIXES:
+        if candidate.lower().startswith(prefix) and len(candidate) > len(prefix) + 25:
+            return candidate[len(prefix):].strip()
+    return candidate
+
+
+def extract_title_from_ocr(ocr_md: str) -> str | None:
+    """Find the actual paper title near the OCR header, skipping journal boilerplate."""
+    best: tuple[int, str] | None = None
+    for raw in ocr_md.splitlines()[:80]:
+        stripped = raw.strip()
+        candidate = _clean_ocr_title_candidate(stripped)
+        low = candidate.lower().strip(" :")
+        if not candidate or low in OCR_TITLE_NOISE or low.startswith(OCR_TITLE_PREFIXES):
+            continue
+        if "doi:" in low or " et al." in low or "©" in candidate:
+            continue
+        word_count = len(re.findall(r"[A-Za-z][A-Za-z-]+", candidate))
+        if word_count < 5 or not (25 <= len(candidate) <= 260):
+            continue
+        score = word_count
+        if stripped.startswith("#"):
+            score += 50
+        if re.search(r"\b(randomi[sz]ed|trial|study|protocol|patients?)\b", low):
+            score += 20
+        if ":" in candidate:
+            score += 5
+        if best is None or score > best[0]:
+            best = (score, candidate)
+    return best[1] if best else None
 
 
 JOURNAL_CITE_PATTERNS = [
@@ -470,20 +532,37 @@ def _summary_prompt(ocr_md: str, metadata: dict) -> str:
         f"Paper: {title}\n"
         f"Authors: {authors}\n"
         f"Year: {year} · Venue: {venue}\n\n"
+        f"First decide the article type from the OCR: completed trial/results paper, "
+        f"study protocol/design paper, guideline/consensus, observational study, review, "
+        f"or other. This classification controls the summary. If the paper is a protocol "
+        f"or design/rationale paper, say clearly that no outcome results are reported.\n\n"
         f"Produce a Markdown summary with these sections:\n"
+        f"- Paper Type (one sentence; include protocol/design status when applicable)\n"
         f"- Clinical Question (1 sentence)\n"
         f"- PICO (table: Population, Intervention, Comparator, Outcome)\n"
-        f"- Key Results (specific numbers, hazard ratios, p-values)\n"
-        f"- What Changed? (practice impact)\n"
+        f"- Key Results (only actual reported outcome results; if none, write "
+        f"\"No outcome results are reported in this protocol\" and put sample-size "
+        f"assumptions/planned endpoints in a separate paragraph called Design Assumptions)\n"
+        f"- What Changed? (practice impact; for protocols, say no practice change yet)\n"
         f"- What Did Not Change? (things not proven)\n"
         f"- How I Would Explain This to a Patient (plain language)\n"
         f"- Relevance for Indian Practice (cost, availability, follow-up)\n"
-        f"- Connections (use wikilinks like [[../../concepts/foo|Foo]] for these "
-        f"concept pages: interventional-cardiology, coronary-artery-disease, "
-        f"acute-coronary-syndromes, antiplatelet-therapy, structural-heart, "
-        f"heart-failure, india-practice, coronary-physiology)\n\n"
-        f"Be clinically precise. Quote exact numbers from the paper. "
-        f"Do not invent results. The full OCR follows.\n\n"
+        f"- Connections (use wikilinks like [[../../concepts/foo|Foo]] only for "
+        f"concepts directly supported by the paper. Do not add coronary artery disease, "
+        f"acute coronary syndrome, PCI, antiplatelet therapy, or heart failure links "
+        f"unless the paper is actually about those topics.)\n\n"
+        f"Accuracy rules:\n"
+        f"- Do not infer completed trial findings from planned endpoints, hypotheses, "
+        f"power calculations, expected event rates, or sample-size assumptions.\n"
+        f"- Do not describe estimated rates used for power calculations as results.\n"
+        f"- Do not claim practice change for protocols, rationale/design papers, or trials "
+        f"without published outcome results.\n"
+        f"- Preserve exact trial design details, eligibility criteria, endpoint definitions, "
+        f"follow-up schedule, and sample size when they are stated in the OCR.\n"
+        f"- If metadata title looks generic (for example \"Open access\" or \"Protocol\"), "
+        f"use the actual full paper title from the OCR header.\n"
+        f"- Be clinically precise. Quote exact numbers only when the paper states them. "
+        f"Do not invent results or topic tags. The full OCR follows.\n\n"
         f"--- OCR ---\n{ocr_md[:120000]}"
     )
 
@@ -658,9 +737,14 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
         "Take the structured summary below and produce a clean, Markdown-only wiki page body "
         "(NO YAML frontmatter — that will be prepended separately). "
         "Start with a level-1 heading using the paper title, then sections: "
-        "Clinical Question, PICO (table), Key Results, What Changed?, What Did Not Change?, "
-        "How I Would Explain This to a Patient, Relevance for Indian Practice, Related Trials. "
-        "Be clinically precise; do not invent claims. Keep paragraphs tight."
+        "Paper Type, Clinical Question, PICO (table), Key Results, What Changed?, "
+        "What Did Not Change?, How I Would Explain This to a Patient, "
+        "Relevance for Indian Practice, Related Trials. "
+        "If the source is a protocol/design paper, preserve the statement that no outcome "
+        "results are reported, keep planned endpoints and sample-size assumptions separate "
+        "from results, and state that no practice change should be inferred yet. "
+        "Do not add unrelated coronary/PCI/ACS/antiplatelet content unless present in the "
+        "summary. Be clinically precise; do not invent claims. Keep paragraphs tight."
     )
     user = (
         f"Title: {title}\nLink: {abs_url}\n\n"
@@ -930,11 +1014,7 @@ def ingest_pipeline(
 
         ocr_title = title_hint
         if not ocr_title:
-            for line in ocr_md.splitlines()[:20]:
-                line = line.strip().lstrip("# ").strip()
-                if 8 <= len(line) <= 200 and not line.lower().startswith(("abstract", "doi", "preprint", "received")):
-                    ocr_title = line
-                    break
+            ocr_title = extract_title_from_ocr(ocr_md)
 
         # ── 3. Citation lookup ────────────────────────────────────────────
         metadata = None
