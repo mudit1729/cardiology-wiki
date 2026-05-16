@@ -9,34 +9,17 @@
       <p class="eyebrow">Ingest</p>
       <h1>Add a paper</h1>
       <p class="lede">
-        Paste a PubMed / NEJM / Lancet / JACC / arxiv link, or upload a PDF.
-        The pipeline runs Mistral OCR &rarr; Semantic Scholar (XAI fallback) &rarr; DeepSeek
-        summarization &rarr; final integration, writes the wiki page, and can push it to GitHub.
+        Upload a PDF. The pipeline runs Mistral OCR &rarr; Semantic Scholar
+        &rarr; DeepSeek summarization &rarr; final integration, writes the wiki page,
+        and can push it to GitHub.
       </p>
     </header>
 
     <form id="ingest-form" class="add-paper-form">
       <div class="field">
-        <label for="paper-url">Paper URL</label>
-        <input id="paper-url" name="url" type="url" placeholder="https://pubmed.ncbi.nlm.nih.gov/12345678/"
-               autocomplete="off" autofocus>
-        <small>Reliable sources: pubmed.ncbi.nlm.nih.gov &middot; nejm.org &middot; thelancet.com &middot; jacc.org &middot; ahajournals.org &middot; arxiv.org</small>
-      </div>
-
-      <div class="field">
-        <label for="paper-pdf">&hellip;or upload a PDF</label>
-        <input id="paper-pdf" name="pdf" type="file" accept="application/pdf">
-      </div>
-
-      <div class="field-row">
-        <div class="field">
-          <label for="paper-title">Title hint <span class="muted">(optional)</span></label>
-          <input id="paper-title" name="title" type="text" placeholder="Used if Semantic Scholar can't find the paper">
-        </div>
-        <div class="field">
-          <label for="paper-slug">Slug override <span class="muted">(optional)</span></label>
-          <input id="paper-slug" name="slug" type="text" placeholder="e.g. ischemia-2020-revascularization">
-        </div>
+        <label for="paper-pdf">PDF file</label>
+        <input id="paper-pdf" name="pdf" type="file" accept="application/pdf" required autofocus>
+        <small>Upload the paper PDF directly. Metadata, title, and slug are inferred automatically.</small>
       </div>
 
       <div class="field">
