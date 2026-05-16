@@ -1,6 +1,6 @@
 import unittest
 
-from paper_ingest import auto_tag, extract_title_from_ocr, infer_paper_type, normalize_page_body, _summary_prompt
+from paper_ingest import auto_tag, extract_title_from_ocr, infer_domain, infer_paper_type, normalize_page_body, _summary_prompt
 
 
 class PaperIngestPromptTests(unittest.TestCase):
@@ -63,6 +63,21 @@ No outcome results are reported in this protocol.
         self.assertEqual(
             infer_paper_type("ABLATION protocol", "No outcome results are reported in this protocol."),
             "protocol",
+        )
+
+    def test_domain_is_inferred_for_valve_rheumatic_paper(self):
+        self.assertEqual(
+            infer_domain(
+                "Bi-atrial versus left atrial ablation for rheumatic mitral valve disease",
+                "Patients with rheumatic mitral valve disease and non-paroxysmal atrial fibrillation underwent mitral valve surgery.",
+            ),
+            "valve-rheumatic",
+        )
+
+    def test_domain_hint_overrides_inference(self):
+        self.assertEqual(
+            infer_domain("General coronary paper", "PCI and stent optimization.", "device-technology"),
+            "device-technology",
         )
 
 

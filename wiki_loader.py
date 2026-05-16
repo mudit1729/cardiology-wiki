@@ -37,17 +37,21 @@ PAPER_TYPE_LABELS = {
     "procedure": "Procedures",
 }
 DOMAIN_LABELS = {
-    "stable-cad": "Stable CAD",
+    "coronary-pci": "Coronary / PCI",
     "acs": "ACS / STEMI",
-    "imaging": "Imaging-Guided PCI",
-    "physiology": "Physiology-Guided PCI",
-    "antiplatelet": "Antiplatelets / DAPT",
-    "af-ep": "AF / EP",
-    "af-pci": "AF + PCI",
-    "structural": "TAVR / Structural Heart",
+    "imaging-guided-pci": "Imaging-Guided PCI",
+    "physiology-guided-pci": "Physiology-Guided PCI",
+    "antithrombotic": "Antiplatelet / Antithrombotic",
+    "structural-heart": "Structural Heart",
     "valve-rheumatic": "Valve / Rheumatic",
-    "prevention": "Lipid / Prevention",
-    "heart-failure": "Heart Failure",
+    "peripheral-endovascular": "Peripheral / Endovascular",
+    "heart-failure-shock": "Heart Failure / Shock",
+    "prevention-lipids": "Prevention / Lipids",
+    "ep-af": "EP-Relevant / AF",
+    "device-technology": "Device / Technology",
+    "complications-safety": "Complications / Safety",
+    "guidelines-appropriate-use": "Guidelines / Appropriate Use",
+    "india-lmic": "India / LMIC Practice",
     "other": "Other",
 }
 
@@ -152,7 +156,9 @@ class WikiRepository:
             except (ValueError, TypeError):
                 citations_val = 0
             paper_type = self._classify_paper_type(meta, tags)
-            domain = self._classify_domain(tags)
+            domain = str(meta.get("domain") or "").strip().lower()
+            if domain not in DOMAIN_LABELS:
+                domain = self._classify_domain(tags)
 
             pages[path] = Page(
                 path=path,
@@ -301,7 +307,7 @@ class WikiRepository:
             if any(p.paper_type == key for p in papers):
                 topics.append((f"type:{key}", label))
         for key, label in DOMAIN_LABELS.items():
-            if key != "other" and any(p.domain == key for p in papers):
+            if key != "other":
                 topics.append((f"domain:{key}", label))
         return topics
 
@@ -314,7 +320,7 @@ class WikiRepository:
                 collections[f"Evidence: {label}"] = matches
         for key, label in DOMAIN_LABELS.items():
             matches = [p for p in all_papers if p.domain == key]
-            if matches:
+            if key != "other" or matches:
                 collections[f"Domain: {label}"] = matches
         return collections
 
@@ -378,29 +384,38 @@ class WikiRepository:
         return "context"
 
     def _classify_domain(self, tags: list[str]) -> str:
+        # Kept tag-based for older pages; newer ingests write `domain` directly.
         tag_set = set(tags)
-        if tag_set & {"stable-cad", "chronic-coronary-disease"}:
-            return "stable-cad"
+        if tag_set & {"guideline", "appropriate-use", "appropriateness"}:
+            return "guidelines-appropriate-use"
+        if tag_set & {"india-practice", "india-lmic", "lmic"}:
+            return "india-lmic"
+        if tag_set & {"complication", "complications-safety", "safety", "stent-thrombosis", "restenosis", "bleeding", "aki", "perforation", "no-reflow", "vascular-complications"}:
+            return "complications-safety"
+        if tag_set & {"device-technology", "device-study", "des", "dcb", "scaffold", "atherectomy", "lithotripsy", "embolic-protection", "closure-device"}:
+            return "device-technology"
+        if tag_set & {"peripheral-endovascular", "pad", "carotid", "renal", "limb-ischemia", "aortic"}:
+            return "peripheral-endovascular"
+        if tag_set & {"heart-failure", "sglt2", "hfref", "hfpef", "shock", "cardiogenic-shock", "mcs", "iabp", "impella", "ecmo", "high-risk-pci"}:
+            return "heart-failure-shock"
+        if tag_set & {"rheumatic-heart-disease", "rheumatic", "mitral", "pbmv", "ptmc"}:
+            return "valve-rheumatic"
         if tag_set & {"acs", "stemi", "nstemi", "acute-coronary-syndrome"}:
             return "acs"
         if tag_set & {"ivus", "oct", "imaging-guided-pci", "intravascular-imaging"}:
-            return "imaging"
+            return "imaging-guided-pci"
         if tag_set & {"ffr", "ifr", "physiology-guided-pci", "coronary-physiology"}:
-            return "physiology"
+            return "physiology-guided-pci"
         if tag_set & {"antiplatelet", "dapt", "dual-antiplatelet", "antithrombotic"}:
-            return "antiplatelet"
-        if tag_set & {"rheumatic-heart-disease", "rheumatic", "mitral"}:
-            return "valve-rheumatic"
-        if "af-pci" in tag_set:
-            return "af-pci"
+            return "antithrombotic"
+        if tag_set & {"tavr", "tavi", "structural-heart", "aortic-stenosis", "teer", "mitraclip", "laao", "asd", "pfo", "paravalvular-leak"}:
+            return "structural-heart"
+        if tag_set & {"lipid", "lipid-prevention", "pcsk9", "statin", "prevention", "glp1", "lpa", "colchicine"}:
+            return "prevention-lipids"
         if tag_set & {"atrial-fibrillation", "anticoagulation"}:
-            return "af-ep"
-        if tag_set & {"tavr", "structural-heart", "aortic-stenosis", "tavi"}:
-            return "structural"
-        if tag_set & {"lipid", "lipid-prevention", "pcsk9", "statin", "prevention", "glp1"}:
-            return "prevention"
-        if tag_set & {"heart-failure", "sglt2", "hfref", "hfpef"}:
-            return "heart-failure"
+            return "ep-af"
+        if tag_set & {"stable-cad", "chronic-coronary-disease", "pci", "coronary", "complex-pci", "left-main", "bifurcation", "cto", "calcified-lesion"}:
+            return "coronary-pci"
         return "other"
 
     def paper_graph_data(self) -> dict:

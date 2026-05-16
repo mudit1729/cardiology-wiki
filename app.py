@@ -24,7 +24,7 @@ from flask import (
     url_for,
 )
 
-from wiki_loader import WikiRepository
+from wiki_loader import DOMAIN_LABELS, PAPER_TYPE_LABELS, WikiRepository
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,21 +53,6 @@ _WIKI_PASSWORD = os.environ.get("WIKI_PASSWORD", "Asd1729@")
 _PUBLIC_ENDPOINTS = {"login", "static"}
 
 repo = WikiRepository(BASE_DIR)
-
-CHAT_TOPICS = [
-    ("all", "All Pages"),
-    ("stable-cad", "Stable CAD"),
-    ("acs", "ACS / STEMI"),
-    ("antiplatelet", "Antiplatelets"),
-    ("ivus", "IVUS / OCT"),
-    ("ffr", "FFR / iFR"),
-    ("tavr", "TAVR"),
-    ("heart-failure", "Heart Failure"),
-    ("lipid", "Lipids / Prevention"),
-    ("atrial-fibrillation", "AF + PCI"),
-    ("pci", "PCI / Procedures"),
-    ("guideline", "Guidelines"),
-]
 
 CHAT_CONTEXT_CHAR_LIMIT = int(os.environ.get("CHAT_CONTEXT_CHAR_LIMIT", "60000"))
 CHAT_MAX_PAPERS = int(os.environ.get("CHAT_MAX_PAPERS", "40"))
@@ -191,6 +176,8 @@ def timeline():
     return render_template(
         "timeline.html",
         timeline_data=timeline_data,
+        domain_filters=[(key, label) for key, label in DOMAIN_LABELS.items() if key != "other"],
+        type_filters=PAPER_TYPE_LABELS,
         timeline_json=json.dumps(timeline_data),
     )
 
@@ -237,20 +224,8 @@ def papers_related():
     graph = repo.paper_graph_data()
     nodes = graph.get("nodes") or []
 
-    group_tags = {
-        "stable-cad": {"stable-cad", "chronic-coronary-disease"},
-        "acs": {"acs", "stemi", "nstemi", "acute-coronary-syndrome"},
-        "imaging-guided-pci": {"ivus", "oct", "imaging-guided-pci", "intravascular-imaging"},
-        "physiology-guided-pci": {"ffr", "ifr", "physiology-guided-pci", "coronary-physiology"},
-        "antiplatelet": {"antiplatelet", "dapt", "dual-antiplatelet", "antithrombotic"},
-        "af-pci": {"atrial-fibrillation", "af-pci", "anticoagulation"},
-        "structural-heart": {"tavr", "structural-heart", "aortic-stenosis", "tavi", "mitral"},
-        "lipid-prevention": {"lipid", "lipid-prevention", "pcsk9", "statin", "prevention", "glp1"},
-        "heart-failure": {"heart-failure", "sglt2", "hfref", "hfpef"},
-    }
-    wanted = group_tags.get(group)
-    if wanted:
-        nodes = [n for n in nodes if wanted & set(n.get("tags") or [])]
+    if group in DOMAIN_LABELS:
+        nodes = [n for n in nodes if n.get("domain") == group]
     elif group and group not in {"all", ""}:
         nodes = []
 
@@ -464,7 +439,7 @@ def _build_deepseek_messages(
         "physiology-guided PCI (FFR/iFR), antiplatelet therapy, TAVR, heart failure, and lipid management. "
         "Answer using the selected page summaries as your primary evidence. "
         "When citing a trial or guideline, ALWAYS use a markdown link with the wiki path: "
-        "[Trial Name](/page/wiki/trials/domain/trial-slug). "
+        "[Evidence Title](/page/wiki/sources/papers/paper-slug). "
         "The paths for each page are provided in the context. "
         "Separate direct source claims from synthesis when the distinction matters. "
         "If the selected pages do not contain enough evidence, say what is missing. "

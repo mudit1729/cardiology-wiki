@@ -5,6 +5,7 @@ status: active
 updated: 2026-05-16
 year: 2022
 paper_type: protocol
+domain: valve-rheumatic
 venue: "BMJ Open"
 doi: "10.1136/bmjopen-2022-064861"
 source_url: "https://doi.org/10.1136/bmjopen-2022-064861"

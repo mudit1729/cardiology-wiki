@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Trial Graph | {{ repo_title }}{% endblock %}
+{% block title %}Evidence Graph | {{ repo_title }}{% endblock %}
 
 {% block content %}
   <section class="graph-page">
     <div class="graph-header">
       <div class="section-heading">
-        <h1>Trial Graph</h1>
-        <p class="muted">Click a trial to explore its neighborhood. Double-click to open.</p>
+        <h1>Evidence Graph</h1>
+        <p class="muted">Click an evidence page to explore its neighborhood. Double-click to open.</p>
       </div>
       <div class="graph-search-wrap">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -18,17 +18,21 @@
 
     <div class="graph-controls" data-filter-row="domain">
       <button class="chip active" data-domain="all">All Domains</button>
-      <button class="chip" data-group="stable-cad">Stable CAD</button>
+      <button class="chip" data-group="coronary-pci">Coronary/PCI</button>
       <button class="chip" data-group="acs">ACS/STEMI</button>
-      <button class="chip" data-group="imaging">Imaging PCI</button>
-      <button class="chip" data-group="physiology">Physiology PCI</button>
-      <button class="chip" data-group="antiplatelet">Antiplatelets</button>
-      <button class="chip" data-group="af-pci">AF+PCI</button>
-      <button class="chip" data-group="af-ep">AF/EP</button>
+      <button class="chip" data-group="imaging-guided-pci">Imaging PCI</button>
+      <button class="chip" data-group="physiology-guided-pci">Physiology PCI</button>
+      <button class="chip" data-group="antithrombotic">Antithrombotic</button>
       <button class="chip" data-group="valve-rheumatic">Valve/Rheumatic</button>
-      <button class="chip" data-group="structural">Structural</button>
-      <button class="chip" data-group="prevention">Prevention</button>
-      <button class="chip" data-group="heart-failure">Heart Failure</button>
+      <button class="chip" data-group="structural-heart">Structural</button>
+      <button class="chip" data-group="peripheral-endovascular">Peripheral</button>
+      <button class="chip" data-group="heart-failure-shock">HF/Shock</button>
+      <button class="chip" data-group="prevention-lipids">Prevention</button>
+      <button class="chip" data-group="ep-af">EP/AF</button>
+      <button class="chip" data-group="device-technology">Devices</button>
+      <button class="chip" data-group="complications-safety">Safety</button>
+      <button class="chip" data-group="guidelines-appropriate-use">Guidelines/Appropriate Use</button>
+      <button class="chip" data-group="india-lmic">India/LMIC</button>
     </div>
     <div class="graph-controls" data-filter-row="type">
       <button class="chip active" data-type="all">All Types</button>
@@ -80,34 +84,42 @@
 
     const graphData = {{ graph_json | safe }};
     const groupColors = {
-      'stable-cad':    '#f59e0b',
+      'coronary-pci':  '#f59e0b',
       'acs':           '#ef4444',
-      'imaging':       '#3b82f6',
-      'physiology':    '#8b5cf6',
-      'antiplatelet':  '#ec4899',
-      'af-pci':        '#f97316',
-      'af-ep':         '#fb923c',
+      'imaging-guided-pci':'#3b82f6',
+      'physiology-guided-pci':'#8b5cf6',
+      'antithrombotic':'#ec4899',
       'valve-rheumatic':'#0ea5e9',
-      'structural':    '#06b6d4',
-      'prevention':    '#10b981',
-      'heart-failure': '#14b8a6',
+      'structural-heart':'#06b6d4',
+      'peripheral-endovascular':'#84cc16',
+      'heart-failure-shock':'#14b8a6',
+      'prevention-lipids':'#10b981',
+      'ep-af':         '#fb923c',
+      'device-technology':'#64748b',
+      'complications-safety':'#dc2626',
+      'guidelines-appropriate-use':'#a855f7',
+      'india-lmic':    '#22c55e',
       'procedure':     '#6366f1',
       'guideline':     '#a855f7',
       'conference':    '#eab308',
       'other':         '#6b7280',
     };
     const groupNames = {
-      'stable-cad':    'Stable CAD',
-      'acs':           'ACS/STEMI',
-      'imaging':       'Imaging PCI',
-      'physiology':    'Physiology PCI',
-      'antiplatelet':  'Antiplatelets',
-      'af-pci':        'AF+PCI',
-      'af-ep':         'AF/EP',
-      'valve-rheumatic':'Valve/Rheumatic',
-      'structural':    'Structural',
-      'prevention':    'Prevention',
-      'heart-failure': 'Heart Failure',
+      'coronary-pci':  'Coronary / PCI',
+      'acs':           'ACS / STEMI',
+      'imaging-guided-pci':'Imaging-Guided PCI',
+      'physiology-guided-pci':'Physiology-Guided PCI',
+      'antithrombotic':'Antiplatelet / Antithrombotic',
+      'valve-rheumatic':'Valve / Rheumatic',
+      'structural-heart':'Structural Heart',
+      'peripheral-endovascular':'Peripheral / Endovascular',
+      'heart-failure-shock':'Heart Failure / Shock',
+      'prevention-lipids':'Prevention / Lipids',
+      'ep-af':         'EP-Relevant / AF',
+      'device-technology':'Device / Technology',
+      'complications-safety':'Complications / Safety',
+      'guidelines-appropriate-use':'Guidelines/Appropriate Use',
+      'india-lmic':    'India / LMIC Practice',
       'procedure':     'Procedures',
       'guideline':     'Guidelines',
       'conference':    'Conferences',

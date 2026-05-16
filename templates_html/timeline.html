@@ -6,27 +6,21 @@
   <section class="timeline-page">
     <div class="section-heading">
       <h1>Research Timeline</h1>
-      <p class="muted">Trials and evidence grouped by research direction across time.</p>
+      <p class="muted">Evidence grouped by research direction across time.</p>
     </div>
 
     <div class="timeline-filters" data-filter-row="domain">
       <button class="chip active" onclick="toggleDirection(this, 'all')">All</button>
-      {% for direction in timeline_data.keys() %}
-        <button class="chip" onclick="toggleDirection(this, '{{ direction }}')">
-          {{ direction }}
-          <span class="badge small">{{ timeline_data[direction]|length }}</span>
+      {% for key, label in domain_filters %}
+        <button class="chip" onclick="toggleDirection(this, '{{ label }}')">
+          {{ label }}
+          <span class="badge small">{{ timeline_data.get(label, [])|length }}</span>
         </button>
       {% endfor %}
     </div>
     <div class="timeline-filters" data-filter-row="type">
       <button class="chip active" onclick="toggleType(this, 'all')">All Types</button>
-      {% set ns = namespace(types={}) %}
-      {% for direction, papers in timeline_data.items() %}
-        {% for p in papers %}
-          {% set _ = ns.types.update({p.paper_type: p.paper_type_label}) %}
-        {% endfor %}
-      {% endfor %}
-      {% for key, label in ns.types.items() %}
+      {% for key, label in type_filters.items() %}
         <button class="chip" onclick="toggleType(this, '{{ key }}')">{{ label }}</button>
       {% endfor %}
     </div>

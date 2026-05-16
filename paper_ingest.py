@@ -445,6 +445,24 @@ TAG_KEYWORDS: list[tuple[str, list[str]]] = [
     ("rheumatic-heart-disease", ["rheumatic heart", "rheumatic mitral"]),
 ]
 
+DOMAIN_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("guidelines-appropriate-use", ["guideline", "appropriate use", "appropriateness criteria", "consensus statement"]),
+    ("india-lmic", ["india", "indian", "lmic", "low-income", "middle-income", "resource-limited"]),
+    ("complications-safety", ["stent thrombosis", "restenosis", "bleeding", "acute kidney injury", "contrast-induced", "perforation", "no-reflow", "vascular complication", "safety alert"]),
+    ("device-technology", ["drug-eluting stent", "drug-coated balloon", "scaffold", "atherectomy", "intravascular lithotripsy", "embolic protection", "closure device", "device"]),
+    ("peripheral-endovascular", ["peripheral artery", "peripheral vascular", "carotid", "renal artery", "limb ischemia", "aortic", "endovascular"]),
+    ("heart-failure-shock", ["cardiogenic shock", "mechanical circulatory support", "impella", "iabp", "ecmo", "heart failure", "high-risk pci"]),
+    ("valve-rheumatic", ["rheumatic", "mitral valve", "mitral stenosis", "pbmv", "ptmc", "valve surgery"]),
+    ("acs", ["acute coronary syndrome", "stemi", "nstemi", "primary pci", "post-mi"]),
+    ("imaging-guided-pci", ["ivus", "oct", "intravascular ultrasound", "optical coherence", "imaging-guided"]),
+    ("physiology-guided-pci", ["ffr", "ifr", "rfr", "cfr", "imr", "coronary physiology"]),
+    ("antithrombotic", ["antiplatelet", "dapt", "p2y12", "aspirin", "ticagrelor", "clopidogrel", "prasugrel", "anticoagulation", "warfarin", "doac"]),
+    ("structural-heart", ["tavr", "tavi", "teer", "mitraclip", "laao", "asd closure", "pfo closure", "paravalvular leak", "structural heart"]),
+    ("prevention-lipids", ["statin", "ezetimibe", "pcsk9", "ldl", "lipoprotein", "lpa", "colchicine", "secondary prevention"]),
+    ("ep-af", ["atrial fibrillation", "left atrial appendage", "ablation", "rhythm control"]),
+    ("coronary-pci", ["pci", "percutaneous coronary intervention", "coronary", "left main", "bifurcation", "cto", "calcified lesion", "stable angina", "stable cad"]),
+]
+
 
 def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]:
     """Return a list of taxonomy tags. Conservative: tag fires only when
@@ -484,6 +502,16 @@ def auto_tag(title: str, body_excerpt: str = "", max_tags: int = 8) -> list[str]
         if len(matched) >= max_tags:
             break
     return matched
+
+
+def infer_domain(title: str, body: str, group_hint: str | None = None) -> str:
+    if group_hint and group_hint in {key for key, _ in DOMAIN_KEYWORDS}:
+        return group_hint
+    text = f"{title}\n{body[:12000]}".lower()
+    for domain, keywords in DOMAIN_KEYWORDS:
+        if any(keyword in text for keyword in keywords):
+            return domain
+    return "other"
 
 
 def xai_year_estimate(title: str) -> int | None:
@@ -670,18 +698,25 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
     today = time.strftime("%Y-%m-%d")
     tags = auto_tag(title, body)
     paper_type = infer_paper_type(title, body)
+    domain = infer_domain(title, body, group_hint)
     if paper_type and paper_type not in tags:
         tags.append(paper_type)
     group_to_tag = {
-        "stable-cad": "stable-cad",
+        "coronary-pci": "pci",
         "acs": "acs",
         "imaging-guided-pci": "imaging-guided-pci",
         "physiology-guided-pci": "physiology-guided-pci",
-        "antiplatelet": "antiplatelet",
-        "af-pci": "af-pci",
+        "antithrombotic": "antithrombotic",
         "structural-heart": "structural-heart",
-        "lipid-prevention": "lipid-prevention",
-        "heart-failure": "heart-failure",
+        "valve-rheumatic": "rheumatic-heart-disease",
+        "peripheral-endovascular": "peripheral-endovascular",
+        "heart-failure-shock": "heart-failure",
+        "prevention-lipids": "prevention",
+        "ep-af": "atrial-fibrillation",
+        "device-technology": "device-technology",
+        "complications-safety": "complications-safety",
+        "guidelines-appropriate-use": "guideline",
+        "india-lmic": "india-practice",
     }
     hinted_tag = group_to_tag.get(group_hint or "")
     if hinted_tag and hinted_tag not in tags:
@@ -706,6 +741,7 @@ def _build_frontmatter(metadata: dict, slug: str, source_info: dict, body: str =
         f"updated: {today}",
         f"year: {year}",
         f"paper_type: {paper_type}",
+        f"domain: {domain}",
     ]
     if venue and venue != "null":
         lines.append(f'venue: "{venue}"')
