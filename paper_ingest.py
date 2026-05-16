@@ -668,6 +668,7 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
     )
 
     xai_key = os.environ.get("XAI_API_KEY") or os.environ.get("GROK_API_KEY")
+    timeout = int(os.environ.get("XAI_INTEGRATION_TIMEOUT", "12"))
     if xai_key:
         try:
             resp = requests.post(
@@ -682,7 +683,7 @@ def xai_integrate(structured_summary: str, metadata: dict, source_info: dict, sl
                     "max_tokens": 6000,
                     "temperature": 0.2,
                 },
-                timeout=300,
+                timeout=timeout,
             )
             if resp.status_code == 200:
                 return resp.json()["choices"][0]["message"]["content"]
@@ -1004,6 +1005,8 @@ def ingest_pipeline(
         if do_openai:
             yield _event("status", stage="integrate", message=f"Final integration via {backend}…")
             body = xai_integrate(structured_summary, metadata, source_info, slug)
+            if body == structured_summary and backend == "xai-grok":
+                yield _event("status", stage="integrate", message="Grok integration unavailable — using GPT-5.5 structured summary")
             yield _event("status", stage="integrate", message=f"Integration done — {len(body):,} chars")
         else:
             yield _event("status", stage="integrate", message="Final integration skipped — using GPT-5.5 structured summary")
